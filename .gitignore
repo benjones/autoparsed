@@ -1,0 +1,15 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/autoparsed
+autoparsed.so
+autoparsed.dylib
+autoparsed.dll
+autoparsed.a
+autoparsed.lib
+autoparsed-test-*
+*.exe
+*.o
+*.obj
+*.lst
