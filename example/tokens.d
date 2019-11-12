@@ -2,7 +2,7 @@
 import autoparsed.autoparsed;
 
 @Token
-const plus = "+";
+enum plus = "+";
 
 @Token
 struct IntLiteral{

@@ -46,5 +46,5 @@ template tokenTypes(alias Module){
 
 template TokenPayload(alias Module){
   import std.variant;
-  alias TokenPaylod = Algebraic!(tokenTypes!Module);
+  alias TokenPayload = Algebraic!(tokenTypes!Module);
 }

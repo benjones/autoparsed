@@ -26,8 +26,13 @@ void main(string[] args){
 
 
   alias PayloadType = TokenPayload!tokens;
-
+  pragma(msg, "payload members");
   pragma(msg, __traits(allMembers, PayloadType));
+
+  auto x = (tokenTypes!tokens)[0]();
+  PayloadType pt;
+
+  pt= x;
   
   parse!exampleGrammar;
 }
