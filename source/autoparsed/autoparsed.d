@@ -11,6 +11,7 @@ struct TokenType(alias T){
 	alias type = T;
   } else {
 	pragma(msg, "not a type");
+	enum value = T;
   }
 }
 
@@ -33,18 +34,24 @@ template tokensFromModule(alias Module){
 
   alias isToken(alias T) = hasUDA!(T, Token);
   alias tokensFromModule = Filter!(isToken, symbolsFromModule!Module);
-
 }
 
 template tokenTypes(alias Module){
   import std.meta : staticMap;
-  
-
   alias tokenTypes = staticMap!(TokenType, tokensFromModule!Module);
-  
 }
 
 template TokenPayload(alias Module){
   import std.variant;
   alias TokenPayload = Algebraic!(tokenTypes!Module);
+}
+
+template notModuleOrPackage(alias T){
+  enum notModuleOrPackage = !(__traits(isModule, T) || __traits(isPackage, T));
+}
+
+template SyntaxRulesFromModule(alias Module){
+  import std.meta: Filter, templateNot;
+  import std.traits: isAggregateType;
+  alias SyntaxRulesFromModule = Filter!(isAggregateType, Filter!(notModuleOrPackage, symbolsFromModule!Module));
 }

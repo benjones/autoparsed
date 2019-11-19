@@ -5,6 +5,7 @@ import exampleGrammar;
 void main(string[] args){
   import std.stdio;
   import std.traits;
+  pragma(msg, "symbols from tokens\n");
   static foreach(sym; symbolsFromModule!tokens){
 	
 	pragma(msg, " a symbol " ~ fullyQualifiedName!sym);
@@ -35,4 +36,18 @@ void main(string[] args){
   pt= x;
   
   parse!exampleGrammar;
+
+
+  
+  pragma(msg, "\ngrammar symbols\n");
+  static foreach(sr; symbolsFromModule!exampleGrammar){
+	pragma(msg, fullyQualifiedName!sr);
+  }
+
+
+  pragma(msg, "\nsyntax rules\n");
+  static foreach(sr; SyntaxRulesFromModule!exampleGrammar){
+	pragma(msg, fullyQualifiedName!sr);
+  }
+  
 }
