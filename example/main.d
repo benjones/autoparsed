@@ -9,7 +9,7 @@ void main(string[] args){
   static foreach(sym; symbolsFromModule!tokens){
 	
 	pragma(msg, " a symbol " ~ fullyQualifiedName!sym);
-	pragma(msg, "is type? " ~ isType!sym);
+	pragma(msg, "is type? " ~  (isType!sym ? "yes" : "no") );
   }
 
   
@@ -47,7 +47,12 @@ void main(string[] args){
 
   pragma(msg, "\nsyntax rules\n");
   static foreach(sr; SyntaxRulesFromModule!exampleGrammar){
-	pragma(msg, fullyQualifiedName!sr);
+	pragma(msg, "\n A SYNTAX RULE: \n" ~ fullyQualifiedName!sr ~ "\n");
+	static foreach(uda; getUDAs!(sr, Syntax)){
+	  pragma(msg, "annotation: " ~ fullyQualifiedName!uda);
+	}
+
+	pragma(msg, "PEG string: " ~ RuleToPegString!sr);
   }
   
 }
