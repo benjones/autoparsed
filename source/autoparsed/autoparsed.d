@@ -64,9 +64,9 @@ template annotatedConstructors(alias T){
 
 template SyntaxRulesFromModule(alias Module){
   import std.meta: Filter, templateNot, staticMap;
-  import std.traits: isAggregateType, fullyQualifiedName;
+  import std.traits: isType, isAggregateType, fullyQualifiedName;
 
-  alias declarations = Filter!(isAggregateType, Filter!(notModuleOrPackage, symbolsFromModule!Module));
+  alias declarations = Filter!(isAggregateType, Filter!(isType, Filter!(notModuleOrPackage, symbolsFromModule!Module)));
   alias SyntaxRulesFromModule = staticMap!(annotatedConstructors, declarations);
 }
 

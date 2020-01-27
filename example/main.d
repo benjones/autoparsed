@@ -1,6 +1,6 @@
 import autoparsed.autoparsed;
 import exampleGrammar;
-
+import sexpGrammar;
 
 void main(string[] args){
   import std.stdio;
@@ -40,13 +40,13 @@ void main(string[] args){
 
   
   pragma(msg, "\ngrammar symbols\n");
-  static foreach(sr; symbolsFromModule!exampleGrammar){
+  static foreach(sr; symbolsFromModule!sexpGrammar){
 	pragma(msg, fullyQualifiedName!sr);
   }
 
 
   pragma(msg, "\nsyntax rules\n");
-  static foreach(sr; SyntaxRulesFromModule!exampleGrammar){
+  static foreach(sr; SyntaxRulesFromModule!sexpGrammar){
 	pragma(msg, "\n A SYNTAX RULE: \n" ~ fullyQualifiedName!sr ~ "\n");
 	static foreach(uda; getUDAs!(sr, Syntax)){
 	  pragma(msg, "annotation: " ~ fullyQualifiedName!uda);
