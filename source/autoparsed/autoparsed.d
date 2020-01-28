@@ -78,18 +78,47 @@ template RuleToPegString(alias Constructor){
 
 
 template FormatSyntax(alias S){
+  import std.traits : hasMember, fullyQualifiedName, TemplateArgsOf;
   import std.meta: staticMap;
   import std.array: join;
+  pragma(msg, "FS: " ~ fullyQualifiedName!S);
   enum formattedPieces = [staticMap!(FormatExpression, S.Elements)];
   pragma(msg, formattedPieces);
   enum FormatSyntax = join(formattedPieces, " ");
 }
 
 template FormatExpression(alias S) {
-  import std.traits: isType;
+  import std.traits: isType, TemplateOf, TemplateArgsOf, fullyQualifiedName;
+  import std.meta : staticMap;
+  import std.array : join;
+  pragma(msg, "FE: ");
+  pragma(msg, S);//fullyQualifiedName!S);
+  static if(isType!S){
+	pragma(msg, "Tempof: " ~ fullyQualifiedName!(TemplateOf!S));
+	pragma(msg, "istypeof ...: " ~ is(typeof(TemplateOf!S)));
+  }
   static if(!isType!S){
 	enum FormatExpression = "`" ~ S ~ "`";
+  } else static if(is(typeof(TemplateOf!S))) {
+	pragma(msg, "template: ", fullyQualifiedName!S );
+	pragma(msg, staticMap!(fullyQualifiedName, TemplateArgsOf!S));
+	alias tArgs = TemplateArgsOf!S;
+	alias recurse(alias T) = FormatExpression!T;
+	pragma(msg, "tArgs");
+	pragma(msg, tArgs);
+	
+	enum fp = [staticMap!(recurse, tArgs)];
+	pragma(msg, fp);
+	enum joinedParts = join(fp, ", ");
+	//pragma(msg, "formatted pieces ", fp);
+	enum FormatExpression = __traits(identifier, S) ~ "(" ~ joinedParts ~ ")";
   } else {
+	pragma(msg, "not a template");
 	enum FormatExpression = __traits(identifier, S);
   }
+}
+
+
+template typeTypeCheck(alias Constructor){
+
 }
