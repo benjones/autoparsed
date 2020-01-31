@@ -20,6 +20,11 @@ public:
 	members = members_;
   }
 
+  override string toString() {
+	import std.array : join;
+	import std.algorithm : map;
+	return "Sexp( " ~ join(map!(a => a.toString)(members), ", ") ~ ")";
+  }
 private:
   Algebraic!(Atom, Sexp)[] members;
 }

@@ -2,6 +2,8 @@ module autoparsed.recursivedescent;
 import autoparsed.syntax;
 import autoparsed.autoparsed;
 
+import std.stdio;
+
 import std.typecons : nullable, Nullable;
 import std.traits: TemplateArgsOf, isInstanceOf, hasUDA;
 import std.range.primitives;
@@ -9,11 +11,15 @@ import std.variant : Algebraic, VariantN;
 
 Nullable!T parse(T, TokenStream)(ref TokenStream tokenStream)
 if(hasUDA!(T, Token)){
+  writeln("parsing token ", T.stringof, " from stream ", tokenStream);
   if(tokenStream.front.type == typeid(TokenType!T)){
-	auto ret = tokenStream.front.get!(T).nullable;
+	writeln("checks out");
+	auto ret = tokenStream.front.get!(TokenType!T).value.nullable;
 	tokenStream.popFront();
+	writeln("we're good, returning ", typeof(ret).stringof);
 	return ret;
   } else {
+	writeln("wrong token type");
 	return Nullable!T();
   }
   
@@ -25,8 +31,10 @@ if(!isInstanceOf!(RegexStar, T) &&
    !isInstanceOf!(RegexPlus, T) &&
    !isInstanceOf!(OneOf, T) &&
    !hasUDA!(T, Token)){
+  import std.traits : getUDAs, isType, Parameters;
   
-  import std.traits : getUDAs, TemplateArgsOf, isType, Parameters, isInstanceOf;
+  writeln("parsing ", T.stringof, " token stream: ", tokenStream);
+
   pragma(msg, "\n\n\nmaking parser for ");
   pragma(msg, T);
 
@@ -107,6 +115,7 @@ if(!isInstanceOf!(RegexStar, T) &&
 
 auto parse(RS, TokenStream)(ref TokenStream tokenStream)
 if(isInstanceOf!(RegexStar, RS)){
+  writeln("parsing regex star ", RS.stringof, " token stream: ", tokenStream);
   pragma(msg, "\n\nRegexStar parser");
   pragma(msg, RS);
   alias Elem = TemplateArgsOf!RS[0];
@@ -114,7 +123,10 @@ if(isInstanceOf!(RegexStar, RS)){
   alias RetType = RemoveNone!(typeof(elem));
   RetType[] ret;
   while(!isNullish(elem)){
-	ret ~= elem.get!RetType;
+	writeln("elem not nullish: ", elem);
+	writeln("trying to append a ", typeof(elem).stringof, " to a ", typeof(ret).stringof);
+	ret ~= transformVariant!RetType(elem);
+	writeln("appended elem to ret in regexstar: ", ret);
 	elem = parse!Elem(tokenStream);
   }
   return ret;
@@ -122,6 +134,8 @@ if(isInstanceOf!(RegexStar, RS)){
 
 auto parse(RS, TokenStream)(ref TokenStream tokenStream)
 if(isInstanceOf!(RegexPlus, RS)){
+
+  writeln("parsing regex plus ", RS.stringof, " token stream: ", tokenStream);
   pragma(msg, "\n\nRegexPlus parser");
   pragma(msg, RS);
   alias StarType = RegexStar!(TemplateArgsOf!RS);
@@ -133,6 +147,9 @@ if(isInstanceOf!(RegexPlus, RS)){
 
 auto parse(OO, TokenStream)(ref TokenStream tokenStream)
 if(isInstanceOf!(OneOf, OO)){
+
+  writeln("parsing one of ", OO.stringof, " token stream: ", tokenStream);
+  
   pragma(msg, "\n\nOneOf parser");
   pragma(msg, OO);
   alias Ts = TemplateArgsOf!OO;
@@ -143,10 +160,14 @@ if(isInstanceOf!(OneOf, OO)){
 	  pragma(msg, isInstanceOf!(Nullable, res));
 	  static if(isInstanceOf!(Nullable, typeof(res))){
 		if(!res.isNull){
-		  return OneOf!(Ts).NodeType(res.get);
+		  writeln("res Nullable and not nullish: ", res);
+		  auto ret = OneOf!(Ts).NodeType(res.get);
+		  writeln("returning ", ret, " with type ", typeof(ret).stringof);
+		  return ret;
 		}
 	  } else {
 		if(res !is null){
+		  writeln("res pointer like and not nullish: ", res);
 		  return OneOf!(Ts).NodeType(res);
 		}
 	  }
@@ -156,12 +177,17 @@ if(isInstanceOf!(OneOf, OO)){
 
 bool check(alias S, TokenStream)(ref TokenStream tokenStream){
   import std.range;
+
+  writeln("checking ", S.stringof, " on tokens ", tokenStream);
   pragma(msg, "\n\ncheck ");
   pragma(msg, TokenStream);
-  if(tokenStream.front.type == typeid(TokenType!S.value)){
+  writeln("actual type ", tokenStream.front.type, " wanted ", (TokenType!S).stringof);
+  if(tokenStream.front.type == typeid(TokenType!S)){
 	tokenStream.popFront();
+	writeln("check ok");
 	return true;
   }
+  writeln("check bad");
   return false;
 }
   
@@ -184,4 +210,21 @@ template RemoveNone(T) if(isInstanceOf!(VariantN, T)){
   alias args = TemplateArgsOf!T;
   enum NotNone(S) = !allSameType!(S, None);
   alias RemoveNone = VariantN!(args[0], Filter!(NotNone, args[1..$]));
+}
+
+auto transformVariant(U, T)(ref T t)
+if(isInstanceOf!(VariantN, T) && isInstanceOf!(VariantN, U))
+{
+  pragma(msg, "converting from ");
+  pragma(msg, T);
+  pragma(msg, " to");
+  pragma(msg, U);
+  writeln("converting from ", T.stringof, " to ", U.stringof);
+  static foreach(Type; TemplateArgsOf!U[1..$]){
+	if(t.type == typeid(Type)){
+	  writeln("type match: ", Type.stringof);
+	  return U(t.get!Type);
+	}
+  }
+  assert(false);
 }
