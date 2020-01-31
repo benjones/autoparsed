@@ -13,7 +13,6 @@ struct Atom {
   string val;
 }
 
-
 class Sexp {
 public:
   @Syntax!(lparen, RegexPlus!(OneOf!(Atom, Sexp)), rparen)

@@ -7,16 +7,21 @@ struct Syntax(T...){
 }
 
 ///PEG rule for picking between options
-struct OneOf(T...){
+struct None {}
+struct OneOf(Ts...){
   import std.traits: fullyQualifiedName;
-  static if(T.length < 2){
+  import std.variant : Algebraic;
+  
+  static if(Ts.length < 2){
 	pragma(msg, "Warning: using OneOf to pick between "
-		   ~ T.length~ " options.  You should probably provide at least 2 options.");
+		   ~ Ts.length~ " options.  You should probably provide at least 2 options.");
 
-	static if(T.length ==1){
-	  pragma(msg, "type provided: " ~ fullyQualifiedName!T[0]);
+	static if(Ts.length ==1){
+	  pragma(msg, "type provided: " ~ fullyQualifiedName!Ts[0]);
 	}
   }
+
+  alias NodeType = Algebraic!(None, Ts);
 }
 
 ///PEG rule for "at least one"
@@ -31,6 +36,6 @@ struct RegexStar(T){
 
 ///PEG rule for 0 or 1 of this
 struct Optional(T){
-
+  
 }
 

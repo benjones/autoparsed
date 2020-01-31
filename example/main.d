@@ -1,4 +1,5 @@
 import autoparsed.autoparsed;
+import autoparsed.recursivedescent;
 import exampleGrammar;
 import sexpGrammar;
 
@@ -6,14 +7,14 @@ void main(string[] args){
   import std.stdio;
   import std.traits;
   pragma(msg, "symbols from tokens\n");
-  static foreach(sym; symbolsFromModule!tokens){
+  static foreach(sym; symbolsFromModule!sexpGrammar){
 	
 	pragma(msg, " a symbol " ~ fullyQualifiedName!sym);
 	pragma(msg, "is type? " ~  (isType!sym ? "yes" : "no") );
   }
 
   
-  static foreach(tok; tokensFromModule!tokens){
+  static foreach(tok; tokensFromModule!sexpGrammar){
 	pragma(msg, tok);
 	pragma(msg, "making");
 	pragma(msg, TokenType!(tok));
@@ -21,23 +22,20 @@ void main(string[] args){
   }
 
   pragma(msg, "token types");
-  static foreach(tt; tokenTypes!tokens){
+  static foreach(tt; tokenTypes!sexpGrammar){
 	pragma(msg, tt);
   }
 
 
-  alias PayloadType = TokenPayload!tokens;
+  alias PayloadType = TokenPayload!sexpGrammar;
   pragma(msg, "payload members");
   pragma(msg, __traits(allMembers, PayloadType));
 
-  auto x = (tokenTypes!tokens)[0]();
+  auto x = (tokenTypes!sexpGrammar)[0]();
   PayloadType pt;
-
+  pragma(msg, PayloadType);
   pt= x;
   
-  parse!exampleGrammar;
-
-
   
   pragma(msg, "\ngrammar symbols\n");
   static foreach(sr; symbolsFromModule!sexpGrammar){
@@ -54,5 +52,12 @@ void main(string[] args){
 
 	pragma(msg, "PEG string: " ~ RuleToPegString!sr);
   }
+
+  PayloadType[] tokens;
+  tokens ~= PayloadType(TokenType!lparen());
+  tokens ~= PayloadType(TokenType!Atom(Atom("hello")));
+  tokens ~= PayloadType(TokenType!rparen());
   
+  auto parsed = parse!Sexp(tokens);
+  writeln(parsed);
 }

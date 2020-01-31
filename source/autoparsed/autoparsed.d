@@ -7,16 +7,13 @@ enum Token;
 struct TokenType(alias T){
   import std.traits : isType;
   static if(isType!T){
-	pragma(msg, "type");
+	pragma(msg, "type");	
 	alias type = T;
+	T value;
   } else {
 	pragma(msg, "not a type");
 	enum value = T;
   }
-}
-
-void parse(alias Module)(){
-  
 }
 
 template symbolsFromModule(alias Module){
