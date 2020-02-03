@@ -56,6 +56,11 @@ void main(string[] args){
   PayloadType[] tokens;
   tokens ~= PayloadType(TokenType!lparen());
   tokens ~= PayloadType(TokenType!Atom(Atom("hello")));
+
+  tokens ~= PayloadType(TokenType!lparen());
+  tokens ~= PayloadType(TokenType!Atom(Atom("goodbye")));
+  tokens ~= PayloadType(TokenType!rparen());
+
   tokens ~= PayloadType(TokenType!rparen());
   
   auto parsed = parse!Sexp(tokens);
