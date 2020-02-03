@@ -27,10 +27,7 @@ if(hasUDA!(T, Token)){
 
 
 T parse(T, TokenStream)(ref TokenStream tokenStream)
-if(!isInstanceOf!(RegexStar, T) &&
-   !isInstanceOf!(RegexPlus, T) &&
-   !isInstanceOf!(OneOf, T) &&
-   !hasUDA!(T, Token)){
+if(annotatedConstructors!(T).length > 0) {
   import std.traits : getUDAs, isType, Parameters;
   
   writeln("parsing ", T.stringof, " token stream: ", tokenStream);
