@@ -7,22 +7,21 @@ import std.stdio;
 import std.typecons : nullable, Nullable;
 import std.traits: TemplateArgsOf, isInstanceOf, hasUDA;
 import std.range.primitives;
-import std.variant : Algebraic, VariantN;
+import sumtype;
 
 Nullable!T parse(T, TokenStream)(ref TokenStream tokenStream)
 if(hasUDA!(T, Token)){
   writeln("parsing token ", T.stringof, " from stream ", tokenStream);
-  if(tokenStream.front.type == typeid(TokenType!T)){
-	writeln("checks out");
-	auto ret = tokenStream.front.get!(TokenType!T).value.nullable;
-	tokenStream.popFront();
-	writeln("we're good, returning ", typeof(ret).stringof);
-	return ret;
-  } else {
-	writeln("wrong token type");
-	return Nullable!T();
-  }
-  
+  return tokenStream.front.match!(
+    (TokenType!T t){
+	  auto ret = t.value.nullable;
+	  tokenStream.popFront;
+	  writeln("matched token, returning ", ret);
+	  return ret;
+	},
+	_ => Nullable!T()
+  );
+
 }
 
 
@@ -178,14 +177,14 @@ bool check(alias S, TokenStream)(ref TokenStream tokenStream){
   writeln("checking ", S.stringof, " on tokens ", tokenStream);
   pragma(msg, "\n\ncheck ");
   pragma(msg, TokenStream);
-  writeln("actual type ", tokenStream.front.type, " wanted ", (TokenType!S).stringof);
-  if(tokenStream.front.type == typeid(TokenType!S)){
-	tokenStream.popFront();
-	writeln("check ok");
-	return true;
-  }
-  writeln("check bad");
-  return false;
+  writeln("actual token ", tokenStream.front, " wanted ", (TokenType!S).stringof);
+  return tokenStream.front.match!(
+    (TokenType!S t) {
+	  tokenStream.popFront();
+	  writeln("check OK");
+	  return true;
+	},
+	_ => false);
 }
   
 bool isNullish(T)(const ref T t){
@@ -193,35 +192,31 @@ bool isNullish(T)(const ref T t){
   pragma(msg, T);
   static if(isInstanceOf!(Nullable, T)){
 	return t.isNull();
-  } else static if(isInstanceOf!(VariantN, T)){
-	return t.type == typeid(None);
+  } else static if(isSumType!T){
+	return t.match!( (None n) => true, _ => false);
   } else {
 	return t is null;
   }
 }
 
 
-template RemoveNone(T) if(isInstanceOf!(VariantN, T)){
+template RemoveNone(T) if(isSumType!T){
   import std.meta : Filter;
   import std.traits : allSameType;
   alias args = TemplateArgsOf!T;
   enum NotNone(S) = !allSameType!(S, None);
-  alias RemoveNone = VariantN!(args[0], Filter!(NotNone, args[1..$]));
+  alias RemoveNone = SumType!(Filter!(NotNone, args));
 }
 
 auto transformVariant(U, T)(ref T t)
-if(isInstanceOf!(VariantN, T) && isInstanceOf!(VariantN, U))
+if(isSumType!T && isSumType!U)
 {
   pragma(msg, "converting from ");
   pragma(msg, T);
   pragma(msg, " to");
   pragma(msg, U);
   writeln("converting from ", T.stringof, " to ", U.stringof);
-  static foreach(Type; TemplateArgsOf!U[1..$]){
-	if(t.type == typeid(Type)){
-	  writeln("type match: ", Type.stringof);
-	  return U(t.get!Type);
-	}
-  }
-  assert(false);
+  return t.match!( x => U(x),
+    function U(None){ assert(false);}
+  );
 }

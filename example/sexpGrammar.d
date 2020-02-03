@@ -1,6 +1,6 @@
 
 import autoparsed.autoparsed;
-import std.variant;
+import sumtype;
 
 @Token
 enum lparen = "(";
@@ -16,7 +16,7 @@ struct Atom {
 class Sexp {
 public:
   @Syntax!(lparen, RegexPlus!(OneOf!(Atom, Sexp)), rparen)
-  this(Algebraic!(Atom, Sexp)[] members_){
+  this(SumType!(Atom, Sexp)[] members_){
 	members = members_;
   }
 
@@ -26,5 +26,5 @@ public:
 	return "Sexp( " ~ join(map!(a => a.toString)(members), ", ") ~ ")";
   }
 private:
-  Algebraic!(Atom, Sexp)[] members;
+  SumType!(Atom, Sexp)[] members;
 }

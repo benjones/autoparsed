@@ -38,8 +38,8 @@ template tokenTypes(alias Module){
 }
 
 template TokenPayload(alias Module){
-  import std.variant;
-  alias TokenPayload = Algebraic!(tokenTypes!Module);
+  import sumtype;
+  alias TokenPayload = SumType!(tokenTypes!Module);
 }
 
 template notModuleOrPackage(alias T){

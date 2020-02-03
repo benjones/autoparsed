@@ -10,7 +10,6 @@ struct Syntax(T...){
 struct None {}
 struct OneOf(Ts...){
   import std.traits: fullyQualifiedName;
-  import std.variant : Algebraic;
   
   static if(Ts.length < 2){
 	pragma(msg, "Warning: using OneOf to pick between "
@@ -20,8 +19,8 @@ struct OneOf(Ts...){
 	  pragma(msg, "type provided: " ~ fullyQualifiedName!Ts[0]);
 	}
   }
-
-  alias NodeType = Algebraic!(None, Ts);
+  import sumtype;
+  alias NodeType = SumType!(None, Ts);
 }
 
 ///PEG rule for "at least one"
