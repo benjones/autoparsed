@@ -1,8 +1,14 @@
 module autoparsed.syntax;
 
-
+pragma(msg, "starting syntax module");
 ///UDA type for annotating constructors as grammar rules
 struct Syntax(T...){
+  alias Elements = T;
+}
+
+///UDA type for annotating the syntax for Tokens
+///Similar to synatx, but "tokens" will be chars here
+struct Lex(T...){
   alias Elements = T;
 }
 
@@ -38,3 +44,7 @@ struct Optional(T){
   
 }
 
+struct Not(T){
+
+}
+pragma(msg, "end syntax module");

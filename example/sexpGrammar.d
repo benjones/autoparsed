@@ -1,6 +1,13 @@
+module sexpGrammar;
 
 import autoparsed.autoparsed;
+import autoparsed.lexer;
+import autoparsed.syntax;
+
 import sumtype;
+
+
+pragma(msg, "parsing sexpgrammar module");
 
 @Token
 enum lparen = "(";
@@ -9,6 +16,7 @@ enum lparen = "(";
 enum rparen = ")";
 
 @Token
+@Lex!(RegexPlus!(Not!(OneOf!(TokenType!lparen, TokenType!rparen))))
 struct Atom {
   string val;
 }
@@ -28,3 +36,5 @@ public:
 private:
   SumType!(Atom, Sexp)[] members;
 }
+
+pragma(msg, "end parsing sexpgrammar module");

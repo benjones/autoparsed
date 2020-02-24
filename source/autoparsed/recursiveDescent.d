@@ -9,8 +9,20 @@ import std.traits: TemplateArgsOf, isInstanceOf, hasUDA;
 import std.range.primitives;
 import sumtype;
 
+pragma(msg, "recursive descent module");
+
 Nullable!T parse(T, TokenStream)(ref TokenStream tokenStream)
-if(hasUDA!(T, Token)){
+if(hasUDA!(T, Lex)){
+  pragma(msg, "making parser for lexable token type");
+  pragma(msg, T);
+  return Nullable!T();
+}
+
+Nullable!T parse(T, TokenStream)(ref TokenStream tokenStream)
+if(hasUDA!(T, Token) && !hasUDA!(T, Lex)){
+  pragma(msg, "making parser for Non-lexable Token ");
+  pragma(msg, T);
+
   writeln("parsing token ", T.stringof, " from stream ", tokenStream);
   return tokenStream.front.match!(
     (TokenType!T t){
@@ -24,6 +36,19 @@ if(hasUDA!(T, Token)){
 
 }
 
+Nullable!T parse(T, TokenStream)(ref TokenStream tokenStream)
+if(isInstanceOf!(TokenType, T)){
+  import std.traits: isType;
+  pragma(msg, "making parser for token type ");
+  pragma(msg, T);
+  static if(isType!(TemplateArgsOf!T)){
+	auto res = parse!(TemplateArgsOf!T)(tokenStream);
+	return res.isNull ? Nullable!T() : Nullable!T(T(res.get));
+  } else {
+	return parseLiteral!T(tokenStream) ? Nullable!T(T()) : Nullable!T();
+  }
+
+}
 
 T parse(T, TokenStream)(ref TokenStream tokenStream)
 if(annotatedConstructors!(T).length > 0) {
@@ -44,13 +69,13 @@ if(annotatedConstructors!(T).length > 0) {
 
   static size_t argNumber(size_t syntaxNumber)(){
 	size_t ret = 0;
-	pragma(msg, "\ncomputing arg number of");
-	pragma(msg, syntaxNumber);
+	//	pragma(msg, "\ncomputing arg number of");
+	//	pragma(msg, syntaxNumber);
 	static foreach(i; 0..syntaxNumber){
-	  pragma(msg, "looking at");
-	  pragma(msg, TemplateArgsOf!syntax[i]);
+	  //	  pragma(msg, "looking at");
+	  //	  pragma(msg, TemplateArgsOf!syntax[i]);
 	  static if(isType!(TemplateArgsOf!syntax[i])){
-		pragma(msg, "does count");
+		//		pragma(msg, "does count");
 		++ret;
 	  }
 	}
@@ -65,12 +90,12 @@ if(annotatedConstructors!(T).length > 0) {
 	pragma(msg, "parse ");
 	pragma(msg, elem);
 	pragma(msg, "corresponding to arg number");
-	pragma(msg, i);
-	pragma(msg, "argnumber: ");
+	//	pragma(msg, i);
+	//	pragma(msg, "argnumber: ");
 	pragma(msg, argNumber!i);
 
 	static if(isType!elem){
-	  pragma(msg, "type");
+	  //	  pragma(msg, "type");
 	  static if(hasUDA!(elem, Token)){
 		auto tok = parse!elem(tokenStream);
 		if(tok.isNull){
@@ -89,17 +114,17 @@ if(annotatedConstructors!(T).length > 0) {
 		if(!rp){
 		  return null;
 		}
-		pragma(msg, "one of case");
-		pragma(msg, typeof(args[argNumber!i]));
-		pragma(msg, "type of rp");
-		pragma(msg, typeof(rp));
+		//		pragma(msg, "one of case");
+		//		pragma(msg, typeof(args[argNumber!i]));
+		//		pragma(msg, "type of rp");
+		//		pragma(msg, typeof(rp));
 		args[argNumber!i] = rp;
 	  } else {
 		pragma(msg, elem);
 		static assert(false, "uh oh");
 	  }
 	} else {
-	  pragma(msg, "not a type");
+	  //	  pragma(msg, "not a type");
 	  if(!check!elem(tokenStream)){
 		return null;
 	  }
@@ -220,3 +245,10 @@ if(isSumType!T && isSumType!U)
     function U(None){ assert(false);}
   );
 }
+
+bool parseLiteral(Lit, TokenStream)(ref TokenStream tokenStream){
+  return false;
+}
+
+
+pragma(msg, "end recursive descent module");
