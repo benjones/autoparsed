@@ -73,8 +73,8 @@ void main(string[] args){
   tokens ~= PayloadType(TokenType!rparen());
   */
 
-  //auto parsed = parse!Sexp(tokens);
-  //writeln(parsed);
+  auto parsed = parse!Sexp(tokens);
+  writeln(parsed);
 }
 
 pragma(msg, "end main module");

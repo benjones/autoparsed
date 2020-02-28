@@ -151,7 +151,8 @@ if(isInstanceOf!(RegexStar, RS)){
   } else {
 	alias ElemType = Elems[0];
   }
-  auto elem = parse!ElemType(tokenStream);
+  TokenStream copy = tokenStream;
+  auto elem = parse!ElemType(copy);
   static if(isInstanceOf!(Nullable, typeof(elem))){
 	pragma(msg, "nullable elem type: ");
 	pragma(msg, ElemType);
@@ -179,7 +180,11 @@ if(isInstanceOf!(RegexStar, RS)){
 	  ret ~= elem;
 	}
 	writeln("appended elem to ret in regexstar: ", ret);
-	elem = parse!ElemType(tokenStream);
+	elem = parse!ElemType(copy);
+  }
+
+  if(ret.length > 0){
+	tokenStream = copy; //something was consumed
   }
   writeln("regex star returning: ", ret, " stream is ", tokenStream);
   return ret;
@@ -228,6 +233,7 @@ if(isInstanceOf!(OneOf, OO)){
 	  } else {
 		if(res !is null){
 		  writeln("res pointer like and not nullish: ", res);
+		  tokenStream = copy;
 		  return nullable(OneOf!(Ts).NodeType(res));
 		}
 	  }
