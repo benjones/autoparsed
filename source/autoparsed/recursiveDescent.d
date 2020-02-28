@@ -304,7 +304,7 @@ if(isInstanceOf!(Sequence, S)){
 
   TokenStream copy = tokenStream; //don't advance on failure
   writeln("parsing sequence: ", S.stringof, " from stream ", tokenStream);
-  static foreach(i, elem; Ts){
+  static foreach(i, elem; Ts){{
 	pragma(msg, "parse ");
 	pragma(msg, elem);
 	pragma(msg, "corresponding to arg number");
@@ -318,40 +318,23 @@ if(isInstanceOf!(Sequence, S)){
 
 	
 	static if(isType!elem){
-	  static if(hasUDA!(elem, Token)){
-		auto tok = parse!elem(copy);
-		if(tok.isNull){
-		  return Nullable!RetType();
-		}
-		set!(argNumber!i)( tok.get);
-	  }
-	  static if(isInstanceOf!(OneOf, elem)){
-		auto oo = parse!(elem)(copy);
-		if(!oo){
-		  return Nullable!RetType();
-		}
-		set!(argNumber!i)(oo);
-	  } else static if(isInstanceOf!(RegexPlus, elem)){
-		auto rp = parse!(elem)(copy);
-		if(!rp){
-		  return Nullable!RetType();
-		}
-		set!(argNumber!i)(rp);
-	  } else static if(isInstanceOf!(Not, elem)){
+
+	  static if(isInstanceOf!(Not, elem)){
 		if(!parse!elem(copy)){
 		  return Nullable!RetType();
 		}
-	  } else static if(is(elem == Token)){
-		
-		if(copy.empty) return Nullable!RetType();
-
-		set!(argNumber!i)(copy.front);
-		copy.popFront;
-		
 	  } else {
-		pragma(msg, elem);
-		static assert(false, "uh oh");
+		auto x = parse!(elem)(copy);
+
+		//an empty array from regexStar is OK
+		static if(!isInstanceOf!(RegexStar, elem)){
+		  if(isNullish(x)){
+			return Nullable!RetType();
+		  }
+		}
+		set!(argNumber!i)(x);
 	  }
+
 	} else {
 	  if(!check!elem(copy)){
 		return Nullable!RetType();
@@ -359,7 +342,7 @@ if(isInstanceOf!(Sequence, S)){
 	}
 	pragma(msg, "done with");
 	pragma(msg, elem);
-  }
+  }}
 
   tokenStream = copy;
   return ret;
@@ -404,12 +387,15 @@ bool check(alias S, TokenStream)(ref TokenStream tokenStream){
 }
   
 bool isNullish(T)(const auto ref T t){
+  import std.traits : isPointer, isDynamicArray;
   pragma(msg, "\nnullish");
   pragma(msg, T);
   static if(isInstanceOf!(Nullable, T)){
 	return t.isNull();
   }  else static if(isPointer!T){
 	return t is null;
+  } else static if(isDynamicArray!T){
+	return t.length == 0;
   } else {
 	return t;
   }
