@@ -52,8 +52,9 @@ struct Lexer(alias Mod){
   void popFront(){
 	import autoparsed.recursivedescent;
 	//should never be called when empty bc of rules of ranges
-	
+	pragma(msg, "begin lexer popfront");
 	front_ = parse!parseRule(bytes_);
+	pragma(msg, "end lexer popfront");
   }
   
 private:

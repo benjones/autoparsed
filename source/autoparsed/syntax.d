@@ -30,21 +30,21 @@ struct OneOf(Ts...){
 }
 
 ///PEG rule for "at least one"
-struct RegexPlus(T){
+struct RegexPlus(T...){
 
 }
 
 ///PEG rule for "0 or more"
-struct RegexStar(T){
+struct RegexStar(T...){
 
 }
 
 ///PEG rule for 0 or 1 of this
-struct Optional(T){
+struct Optional(T...){
   
 }
 
-struct Not(T){
+struct Not(T...){
 
 }
 pragma(msg, "end syntax module");

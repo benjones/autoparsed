@@ -5,21 +5,66 @@ import autoparsed.autoparsed;
 import std.stdio;
 
 import std.typecons : nullable, Nullable;
-import std.traits: TemplateArgsOf, isInstanceOf, hasUDA;
+import std.traits: ReturnType, Unqual, TemplateArgsOf, isInstanceOf, isType, hasUDA, getUDAs, allSameType;
 import std.range.primitives;
 import sumtype;
 
 pragma(msg, "recursive descent module");
 
-Nullable!T parse(T, TokenStream)(ref TokenStream tokenStream)
-if(hasUDA!(T, Lex)){
-  pragma(msg, "making parser for lexable token type");
+template contains(T, Ts...) {
+  import std.meta : anySatisfy;
+  pragma(msg, "contains");
   pragma(msg, T);
-  return Nullable!T();
+  pragma(msg, Ts);
+  enum isSame(U) = allSameType!(TokenType!T, U);
+  alias contains = anySatisfy!(isSame, Ts);
+}
+
+template partOfStream(T, TArgs){
+  import std.range;
+  pragma(msg, "part of stream");
+  pragma(msg, T);
+  pragma(msg, TArgs);
+  enum partOfStream = contains!(T, TemplateArgsOf!TArgs);
 }
 
 Nullable!T parse(T, TokenStream)(ref TokenStream tokenStream)
-if(hasUDA!(T, Token) && !hasUDA!(T, Lex)){
+if(hasUDA!(T, Lex) &&
+   (!isInstanceOf!(SumType, typeof(tokenStream.front())) ||
+	!partOfStream!(T, typeof(tokenStream.front())))){
+  
+  pragma(msg, "making parser for lexable token type");
+  pragma(msg, T);
+  alias uda = getUDAs!(T, Lex);
+  pragma(msg, "lexable with UDA:");
+  pragma(msg, uda);
+  pragma(msg, "template args");
+  pragma(msg, TemplateArgsOf!uda);
+
+  auto parsed = parse!(TemplateArgsOf!uda)(tokenStream);
+  pragma(msg, "type of parsed for lexable");
+  pragma(msg, typeof(parsed));
+
+  static if(isInstanceOf!(Nullable, typeof(parsed))){
+	if(parsed.isNull){
+	  return Nullable!T();
+	} else {
+	  return Nullable!T(T(parsed.get));
+	}
+  } else {
+	if(parsed){
+	  return Nullable!T(T(parsed));
+	} else {
+	  return Nullable!T();
+	}
+  }
+}
+
+Nullable!T parse(T, TokenStream)(ref TokenStream tokenStream)
+if(hasUDA!(T, Token) &&
+   isInstanceOf!(SumType, typeof(tokenStream.front())) &&
+   partOfStream!(T, typeof(tokenStream.front()))){
+  
   pragma(msg, "making parser for Non-lexable Token ");
   pragma(msg, T);
 
@@ -139,28 +184,57 @@ if(isInstanceOf!(RegexStar, RS)){
   writeln("parsing regex star ", RS.stringof, " token stream: ", tokenStream);
   pragma(msg, "\n\nRegexStar parser");
   pragma(msg, RS);
-  alias Elem = TemplateArgsOf!RS[0];
-  auto elem = parse!Elem(tokenStream);
-  alias RetType = RemoveNone!(typeof(elem));
+  alias Elems = TemplateArgsOf!RS;
+  static if(Elems.length > 1){
+	alias ElemType = Sequence!(Elems);
+  } else {
+	alias ElemType = Elems[0];
+  }
+  auto elem = parse!ElemType(tokenStream);
+  static if(isInstanceOf!(OneOf, ElemType)){
+	alias RetType = RemoveNone!(typeof(elem));
+  } else static if(isInstanceOf!(Nullable, typeof(elem))){
+	pragma(msg, "nullable elem type: ");
+	pragma(msg, ElemType);
+	alias RetType = TemplateArgsOf!(typeof(elem))[0];
+  } else {
+	alias RetType = typeof(elem);
+	
+  }
+  
   RetType[] ret;
+  pragma(msg, "RS parser, ret type:");
+  pragma(msg, RetType);
+  pragma(msg, "typeof elem");
+  pragma(msg, typeof(elem));
+  pragma(msg, "typeof ret");
+  pragma(msg, typeof(ret));
+  pragma(msg, "typeof RetType[]");
+  pragma(msg, RetType[]);
   while(!isNullish(elem)){
 	writeln("elem not nullish: ", elem);
 	writeln("trying to append a ", typeof(elem).stringof, " to a ", typeof(ret).stringof);
-	ret ~= transformVariant!RetType(elem);
+	static if(isInstanceOf!(OneOf, ElemType)){
+	  ret ~= transformVariant!RetType(elem);
+	} else {
+	  ret ~= elem;
+	}
 	writeln("appended elem to ret in regexstar: ", ret);
-	elem = parse!Elem(tokenStream);
+	elem = parse!ElemType(tokenStream);
   }
   return ret;
 }
 
-auto parse(RS, TokenStream)(ref TokenStream tokenStream)
-if(isInstanceOf!(RegexPlus, RS)){
+auto parse(RP, TokenStream)(ref TokenStream tokenStream)
+if(isInstanceOf!(RegexPlus, RP)){
 
-  writeln("parsing regex plus ", RS.stringof, " token stream: ", tokenStream);
+  writeln("parsing regex plus ", RP.stringof, " token stream: ", tokenStream);
   pragma(msg, "\n\nRegexPlus parser");
-  pragma(msg, RS);
-  alias StarType = RegexStar!(TemplateArgsOf!RS);
+  pragma(msg, RP);
+  alias StarType = RegexStar!(TemplateArgsOf!RP);
   auto ret = parse!(StarType)(tokenStream);
+  pragma(msg, "RP got this type back from RS: ");
+  pragma(msg, typeof(ret));
   return ret.length > 0 ? ret : null;
 }
 
@@ -196,6 +270,129 @@ if(isInstanceOf!(OneOf, OO)){
   return OneOf!(Ts).NodeType(None());
 }
 
+bool parse(N, TokenStream)(ref TokenStream tokenStream)
+if(isInstanceOf!(Not, N)){
+  
+  return isNullish(parse!(TemplateArgsOf!N)(tokenStream));
+
+}
+
+auto parse(T: Token, TokenStream)(ref TokenStream tokenStream){
+  auto ret = tokenStream.front;
+  tokenStream.popFront;
+  return ret;
+}
+
+struct Sequence(Ts...){
+  alias Elements = Ts;
+}
+
+template hasValue(T){
+  enum hasValue = !isInstanceOf!(Not, T);
+}
+
+template ValueType(T){
+  static if(isInstanceOf!(OneOf, T)){
+	alias ValueType = T.NodeType;
+  } else static if(isInstanceOf!(RegexStar, T) || isInstanceOf!(RegexPlus, T)){
+	alias ValueType = ValueType!(TemplateArgsOf!T)[];
+  } else {
+	alias ValueType = T;
+  }
+}
+
+auto parse(S, TokenStream)(ref TokenStream tokenStream)
+if(isInstanceOf!(Sequence, S)){
+
+  pragma(msg, "sequence parser for");
+  pragma(msg, S);
+  
+  import std.typecons : Tuple;
+  import std.meta : Filter, staticMap, ReplaceAll;
+  
+  alias Ts = S.Elements;
+  alias TsWithValues = Filter!(hasValue, Ts);
+  alias Values = ReplaceAll!(Token, typeof(tokenStream.front()), staticMap!(ValueType, TsWithValues));
+  static if(Values.length > 1){
+	alias RetType = Tuple!(Values);
+  } else {
+	alias RetType = Values[0];
+  }
+  Nullable!RetType ret;
+
+  pragma(msg, "RetType: ");
+  pragma(msg, RetType);
+  
+  static size_t argNumber(size_t syntaxNumber)(){
+	size_t v = 0;
+	static foreach(i; 0..syntaxNumber){
+	  static if(hasValue!(Ts[i])){
+		++v;
+	  }
+	}
+	return v;
+  }
+
+  void set(size_t i, T)(T val){
+	static if(isInstanceOf!(Tuple, RetType)){
+	  ret[i] = val;
+	} else {
+	  static assert(i == 0);
+	  ret = val;
+	}
+  }
+  
+  static foreach(i, elem; Ts){
+	pragma(msg, "parse ");
+	pragma(msg, elem);
+	pragma(msg, "corresponding to arg number");
+	pragma(msg, argNumber!i);
+
+	static if(isType!elem){
+	  static if(hasUDA!(elem, Token)){
+		auto tok = parse!elem(tokenStream);
+		if(tok.isNull){
+		  return Nullable!RetType();
+		}
+		set!(argNumber!i)( tok.get);
+	  }
+	  static if(isInstanceOf!(OneOf, elem)){
+		auto oo = parse!(elem)(tokensStream);
+		if(!oo){
+		  return Nullable!RetType();
+		}
+		set!(argNumber!i)(oo);
+	  } else static if(isInstanceOf!(RegexPlus, elem)){
+		auto rp = parse!(elem)(tokenStream);
+		if(!rp){
+		  return Nullable!RetType();
+		}
+		set!(argNumber!i)(rp);
+	  } else static if(isInstanceOf!(Not, elem)){
+		if(!parse!elem(tokenStream)){
+		  return Nullable!RetType();
+		}
+	  } else static if(is(elem == Token)){
+		if(tokenStream.empty) return Nullable!RetType();
+
+		set!(argNumber!i)(tokenStream.front);
+		tokenStream.popFront;
+		
+	  } else {
+		pragma(msg, elem);
+		static assert(false, "uh oh");
+	  }
+	} else {
+	  if(!check!elem(tokenStream)){
+		return Nullable!RetType();
+	  }
+	}
+  }
+
+  
+  return ret;
+}
+
 bool check(alias S, TokenStream)(ref TokenStream tokenStream){
   import std.range;
 
@@ -212,15 +409,17 @@ bool check(alias S, TokenStream)(ref TokenStream tokenStream){
 	_ => false);
 }
   
-bool isNullish(T)(const ref T t){
+bool isNullish(T)(const auto ref T t){
   pragma(msg, "\nnullish");
   pragma(msg, T);
   static if(isInstanceOf!(Nullable, T)){
 	return t.isNull();
   } else static if(isSumType!T){
 	return t.match!( (None n) => true, _ => false);
-  } else {
+  } else static if(isPointer!T){
 	return t is null;
+  } else {
+	return t;
   }
 }
 

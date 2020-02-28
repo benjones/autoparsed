@@ -16,9 +16,9 @@ enum lparen = "(";
 enum rparen = ")";
 
 @Token
-@Lex!(RegexPlus!(Not!(OneOf!(TokenType!lparen, TokenType!rparen))))
+@Lex!(RegexPlus!(Not!(OneOf!(TokenType!lparen, TokenType!rparen)), Token))
 struct Atom {
-  string val;
+  const(dchar)[] val;
 }
 
 class Sexp {
