@@ -3,21 +3,6 @@ module autoparsed.autoparsed;
 public import autoparsed.syntax;
 pragma(msg, "autoparsed module");
 
-enum Token;
-
-struct TokenType(alias T){
-  import std.traits : isType, fullyQualifiedName;
-  pragma(msg, "token type instantiation for " ~ fullyQualifiedName!T);
-
-  static if(isType!T){
-	pragma(msg, "type");	
-	alias type = T;
-	T value;
-  } else {
-	pragma(msg, "not a type");
-	enum value = T;
-  }
-}
 
 template symbolsFromModule(alias Module){
   import std.meta : staticMap;

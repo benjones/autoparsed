@@ -213,7 +213,7 @@ if(isInstanceOf!(OneOf, OO)){
   
   pragma(msg, "\n\nOneOf parser");
   pragma(msg, OO);
-  alias Ts = TemplateArgsOf!OO;
+  alias Ts = TemplateArgsOf!(OO.NodeType);
   static foreach(T; Ts){{
 	  TokenStream copy = tokenStream; //only advance the stream on success
 	  writeln("trying option: ", T.stringof);

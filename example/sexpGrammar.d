@@ -16,7 +16,7 @@ enum lparen = '(';
 enum rparen = ')';
 
 @Token
-@Lex!(RegexPlus!(Not!(OneOf!(TokenType!lparen, TokenType!rparen)), Token))
+@Lex!(RegexPlus!(Not!(OneOf!(lparen, rparen)), Token))
 struct Atom {
   const(dchar)[] val;
 }

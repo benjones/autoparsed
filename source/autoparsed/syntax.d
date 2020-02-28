@@ -12,9 +12,28 @@ struct Lex(T...){
   alias Elements = T;
 }
 
+///UDA type for annotating that a type or enum is a token
+enum Token;
+
+struct TokenType(alias T){
+  import std.traits : isType, fullyQualifiedName;
+  pragma(msg, "token type instantiation for " ~ fullyQualifiedName!T);
+
+  static if(isType!T){
+	pragma(msg, "type");
+	alias type = T;
+	T value;
+  } else {
+	pragma(msg, "not a type");
+	enum value = T;
+  }
+}
+
+
 ///PEG rule for picking between options
 struct OneOf(Ts...){
-  import std.traits: fullyQualifiedName;
+  import std.traits: fullyQualifiedName, TemplateOf, isInstanceOf, isType;
+  import std.meta : staticMap;
   
   static if(Ts.length < 2){
 	pragma(msg, "Warning: using OneOf to pick between "
@@ -25,7 +44,15 @@ struct OneOf(Ts...){
 	}
   }
   import sumtype;
-  alias NodeType = SumType!Ts;
+  template Wrap(alias T){
+	static if(!isType!T) {
+	  alias Wrap = TokenType!T;
+	} else {
+	  alias Wrap = T;
+	}
+  }
+
+  alias NodeType = SumType!(staticMap!(Wrap, Ts));
 }
 
 ///PEG rule for "at least one"
