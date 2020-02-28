@@ -5,7 +5,7 @@ import autoparsed.autoparsed;
 import std.stdio;
 
 import std.typecons : nullable, Nullable;
-import std.traits: ReturnType, Unqual, TemplateArgsOf, isInstanceOf, isType, hasUDA, getUDAs, allSameType;
+import std.traits: ReturnType, Unqual, TemplateArgsOf, isInstanceOf, isType, hasUDA, getUDAs, allSameType, fullyQualifiedName;
 import std.range.primitives;
 import sumtype;
 
@@ -98,6 +98,7 @@ if(isInstanceOf!(TokenType, T)){
 T parse(T, TokenStream)(ref TokenStream tokenStream)
 if(annotatedConstructors!(T).length > 0) {
   import std.traits : getUDAs, isType, Parameters;
+  import std.meta : staticMap;
   
   writeln("parsing ", T.stringof, " token stream: ", tokenStream);
 
@@ -111,72 +112,24 @@ if(annotatedConstructors!(T).length > 0) {
 
   pragma(msg, "with syntax ");
   pragma(msg, syntax);
-
-  static size_t argNumber(size_t syntaxNumber)(){
-	size_t ret = 0;
-	//	pragma(msg, "\ncomputing arg number of");
-	//	pragma(msg, syntaxNumber);
-	static foreach(i; 0..syntaxNumber){
-	  //	  pragma(msg, "looking at");
-	  //	  pragma(msg, TemplateArgsOf!syntax[i]);
-	  static if(isType!(TemplateArgsOf!syntax[i])){
-		//		pragma(msg, "does count");
-		++ret;
-	  }
-	}
-	return ret;
+  static foreach(i, x; TemplateArgsOf!syntax){
+	pragma(msg, fullyQualifiedName!(TemplateArgsOf!syntax[i]));
   }
-  
+
+
   alias Args = Parameters!(annotatedConstructors!(T)[0]);
   pragma(msg, "constructor args: ");
   pragma(msg, Args);
-  Args args; 
-  static foreach(i, elem; TemplateArgsOf!syntax){
-	pragma(msg, "parse ");
-	pragma(msg, elem);
-	pragma(msg, "corresponding to arg number");
-	//	pragma(msg, i);
-	//	pragma(msg, "argnumber: ");
-	pragma(msg, argNumber!i);
-
-	static if(isType!elem){
-	  //	  pragma(msg, "type");
-	  static if(hasUDA!(elem, Token)){
-		auto tok = parse!elem(tokenStream);
-		if(tok.isNull){
-		  return null;
-		}
-		args[argNumber!i] = tok.get;
-	  }
-	  static if(isInstanceOf!(OneOf, elem)){
-		auto oo = parse!(elem)(tokensStream);
-		if(!oo){
-		  return null;
-		}
-		args[argNumber!i] = oo;
-	  } else static if(isInstanceOf!(RegexPlus, elem)){
-		auto rp = parse!(elem)(tokenStream);
-		if(!rp){
-		  return null;
-		}
-		//		pragma(msg, "one of case");
-		//		pragma(msg, typeof(args[argNumber!i]));
-		//		pragma(msg, "type of rp");
-		//		pragma(msg, typeof(rp));
-		args[argNumber!i] = rp;
-	  } else {
-		pragma(msg, elem);
-		static assert(false, "uh oh");
-	  }
-	} else {
-	  //	  pragma(msg, "not a type");
-	  if(!check!elem(tokenStream)){
-		return null;
-	  }
-	}
+  alias Seq = Sequence!(TemplateArgsOf!syntax);
+  pragma(msg, "seq:");
+  pragma(msg, Seq);
+  auto parsed =  parse!Seq(tokenStream);
+  if(parsed.isNull){
+	return null;
+  } else {
+	return new T(parsed.get);
   }
-				 
-  return new T(args);
+
 }
 
 auto parse(RS, TokenStream)(ref TokenStream tokenStream)
@@ -287,15 +240,15 @@ struct Sequence(Ts...){
   alias Elements = Ts;
 }
 
-template hasValue(T){
-  enum hasValue = !isInstanceOf!(Not, T);
+template hasValue(alias T){
+  enum hasValue = isType!T && !isInstanceOf!(Not, T);
 }
 
 template ValueType(T){
   static if(isInstanceOf!(OneOf, T)){
 	alias ValueType = T.NodeType;
   } else static if(isInstanceOf!(RegexStar, T) || isInstanceOf!(RegexPlus, T)){
-	alias ValueType = ValueType!(TemplateArgsOf!T)[];
+	alias ValueType = RemoveNone!(ValueType!(TemplateArgsOf!T))[];
   } else {
 	alias ValueType = T;
   }
@@ -347,7 +300,14 @@ if(isInstanceOf!(Sequence, S)){
 	pragma(msg, elem);
 	pragma(msg, "corresponding to arg number");
 	pragma(msg, argNumber!i);
+	pragma(msg, "with type");
+	static if(isInstanceOf!(Tuple, RetType)){
+	  pragma(msg, typeof(ret[argNumber!i]));
+	} else {
+	  pragma(msg, typeof(ret));
+	}
 
+	
 	static if(isType!elem){
 	  static if(hasUDA!(elem, Token)){
 		auto tok = parse!elem(tokenStream);
@@ -387,6 +347,8 @@ if(isInstanceOf!(Sequence, S)){
 		return Nullable!RetType();
 	  }
 	}
+	pragma(msg, "done with");
+	pragma(msg, elem);
   }
 
   
@@ -424,12 +386,17 @@ bool isNullish(T)(const auto ref T t){
 }
 
 
-template RemoveNone(T) if(isSumType!T){
+template RemoveNone(T){
+
   import std.meta : Filter;
   import std.traits : allSameType;
-  alias args = TemplateArgsOf!T;
-  enum NotNone(S) = !allSameType!(S, None);
-  alias RemoveNone = SumType!(Filter!(NotNone, args));
+  static if(isSumType!T){
+	alias args = TemplateArgsOf!T;
+	enum NotNone(S) = !allSameType!(S, None);
+	alias RemoveNone = SumType!(Filter!(NotNone, args));
+  } else {
+	alias RemoveNone = T;
+  }
 }
 
 auto transformVariant(U, T)(ref T t)
