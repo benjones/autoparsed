@@ -58,9 +58,11 @@ void main(string[] args){
   }
 
   import autoparsed.lexer;
+  writeln("starting lexer");
   auto lexer = Lexer!sexpGrammar("(hello(goodbye))");
   PayloadType[] tokens = lexer.array;
-  
+  writeln("lexed into tokens");
+  writeln(tokens);
   /*  tokens ~= PayloadType(TokenType!lparen());
   tokens ~= PayloadType(TokenType!Atom(Atom("hello")));
 
@@ -70,8 +72,9 @@ void main(string[] args){
 
   tokens ~= PayloadType(TokenType!rparen());
   */
-  auto parsed = parse!Sexp(tokens);
-  writeln(parsed);
+
+  //auto parsed = parse!Sexp(tokens);
+  //writeln(parsed);
 }
 
 pragma(msg, "end main module");

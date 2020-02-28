@@ -10,10 +10,10 @@ import sumtype;
 pragma(msg, "parsing sexpgrammar module");
 
 @Token
-enum lparen = "(";
+enum lparen = '(';
 
 @Token
-enum rparen = ")";
+enum rparen = ')';
 
 @Token
 @Lex!(RegexPlus!(Not!(OneOf!(TokenType!lparen, TokenType!rparen)), Token))
