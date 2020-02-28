@@ -144,9 +144,7 @@ if(isInstanceOf!(RegexStar, RS)){
 	alias ElemType = Elems[0];
   }
   auto elem = parse!ElemType(tokenStream);
-  static if(isInstanceOf!(OneOf, ElemType)){
-	alias RetType = RemoveNone!(typeof(elem));
-  } else static if(isInstanceOf!(Nullable, typeof(elem))){
+  static if(isInstanceOf!(Nullable, typeof(elem))){
 	pragma(msg, "nullable elem type: ");
 	pragma(msg, ElemType);
 	alias RetType = TemplateArgsOf!(typeof(elem))[0];
@@ -167,8 +165,8 @@ if(isInstanceOf!(RegexStar, RS)){
   while(!isNullish(elem)){
 	writeln("elem not nullish: ", elem);
 	writeln("trying to append a ", typeof(elem).stringof, " to a ", typeof(ret).stringof);
-	static if(isInstanceOf!(OneOf, ElemType)){
-	  ret ~= transformVariant!RetType(elem);
+	static if(isInstanceOf!(Nullable, typeof(elem))){
+	  ret ~= elem.get;
 	} else {
 	  ret ~= elem;
 	}
@@ -195,7 +193,8 @@ if(isInstanceOf!(RegexPlus, RP)){
 
 auto parse(OO, TokenStream)(ref TokenStream tokenStream)
 if(isInstanceOf!(OneOf, OO)){
-
+  import std.typecons : nullable;
+  
   writeln("parsing one of ", OO.stringof, " token stream: ", tokenStream);
   
   pragma(msg, "\n\nOneOf parser");
@@ -209,18 +208,18 @@ if(isInstanceOf!(OneOf, OO)){
 	  static if(isInstanceOf!(Nullable, typeof(res))){
 		if(!res.isNull){
 		  writeln("res Nullable and not nullish: ", res);
-		  auto ret = OneOf!(Ts).NodeType(res.get);
+		  auto ret = nullable(OneOf!(Ts).NodeType(res.get));
 		  writeln("returning ", ret, " with type ", typeof(ret).stringof);
 		  return ret;
 		}
 	  } else {
 		if(res !is null){
 		  writeln("res pointer like and not nullish: ", res);
-		  return OneOf!(Ts).NodeType(res);
+		  return nullable(OneOf!(Ts).NodeType(res));
 		}
 	  }
   }}
-  return OneOf!(Ts).NodeType(None());
+  return Nullable!(OneOf!(Ts).NodeType)();
 }
 
 bool parse(N, TokenStream)(ref TokenStream tokenStream)
@@ -248,7 +247,7 @@ template ValueType(T){
   static if(isInstanceOf!(OneOf, T)){
 	alias ValueType = T.NodeType;
   } else static if(isInstanceOf!(RegexStar, T) || isInstanceOf!(RegexPlus, T)){
-	alias ValueType = RemoveNone!(ValueType!(TemplateArgsOf!T))[];
+	alias ValueType = ValueType!(TemplateArgsOf!T)[];
   } else {
 	alias ValueType = T;
   }
@@ -376,9 +375,7 @@ bool isNullish(T)(const auto ref T t){
   pragma(msg, T);
   static if(isInstanceOf!(Nullable, T)){
 	return t.isNull();
-  } else static if(isSumType!T){
-	return t.match!( (None n) => true, _ => false);
-  } else static if(isPointer!T){
+  }  else static if(isPointer!T){
 	return t is null;
   } else {
 	return t;
@@ -386,31 +383,7 @@ bool isNullish(T)(const auto ref T t){
 }
 
 
-template RemoveNone(T){
 
-  import std.meta : Filter;
-  import std.traits : allSameType;
-  static if(isSumType!T){
-	alias args = TemplateArgsOf!T;
-	enum NotNone(S) = !allSameType!(S, None);
-	alias RemoveNone = SumType!(Filter!(NotNone, args));
-  } else {
-	alias RemoveNone = T;
-  }
-}
-
-auto transformVariant(U, T)(ref T t)
-if(isSumType!T && isSumType!U)
-{
-  pragma(msg, "converting from ");
-  pragma(msg, T);
-  pragma(msg, " to");
-  pragma(msg, U);
-  writeln("converting from ", T.stringof, " to ", U.stringof);
-  return t.match!( x => U(x),
-    function U(None){ assert(false);}
-  );
-}
 
 bool parseLiteral(Lit, TokenStream)(ref TokenStream tokenStream){
   return false;

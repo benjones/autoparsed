@@ -12,6 +12,7 @@ struct Lexer(alias Mod){
   import sumtype;
   import std.traits;
   import std.meta;
+  import std.typecons : Nullable;
 
   pragma(msg, "lexer symbols from module");
   pragma(msg, "module is");
@@ -36,17 +37,13 @@ struct Lexer(alias Mod){
   }
 
   bool empty(){
-	return front_.match!( (None n) => true, _ => false);
+	return front_.isNull;
   }
 
   auto front(){
 	import std.traits : TemplateArgsOf;
-	alias RetType = SumType!(TemplateArgsOf!(parseRule.NodeType)[1..$]);
-	pragma(msg, "front ret type");
-	pragma(msg, RetType);
 
-	return front_.match!(function RetType(None n){ assert(false); },
-						 ok => RetType(ok));
+	return front_.get();
   }
 
   void popFront(){
@@ -59,6 +56,6 @@ struct Lexer(alias Mod){
   
 private:
   const(char)[] bytes_;
-  parseRule.NodeType front_;
+  Nullable!(parseRule.NodeType) front_;
   
 }

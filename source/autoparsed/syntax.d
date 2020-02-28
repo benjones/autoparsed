@@ -13,7 +13,6 @@ struct Lex(T...){
 }
 
 ///PEG rule for picking between options
-struct None {}
 struct OneOf(Ts...){
   import std.traits: fullyQualifiedName;
   
@@ -26,7 +25,7 @@ struct OneOf(Ts...){
 	}
   }
   import sumtype;
-  alias NodeType = SumType!(None, Ts);
+  alias NodeType = SumType!Ts;
 }
 
 ///PEG rule for "at least one"
