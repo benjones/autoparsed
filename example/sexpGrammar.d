@@ -16,6 +16,12 @@ enum lparen = '(';
 enum rparen = ')';
 
 @Token
+@Lex!(RegexPlus!(OneOf!(' ', '\t', '\r', '\n')))
+struct Whitespace {
+  const(dchar)[] val;
+}
+
+@Token
 @Lex!(RegexPlus!(Not!(OneOf!(lparen, rparen)), Token))
 struct Atom {
   const(dchar)[] val;

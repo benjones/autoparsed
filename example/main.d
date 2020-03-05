@@ -59,8 +59,14 @@ void main(string[] args){
 
   import autoparsed.lexer;
   writeln("starting lexer");
-  auto lexer = Lexer!sexpGrammar("(hello(goodbye))");
-  PayloadType[] tokens = lexer.array;
+  auto lexer = Lexer!sexpGrammar("( \t hello (  goodbye)\n)");
+  PayloadType[] tokens = lexer.filter!(
+									   x => x.match!( (TokenType!Whitespace w){
+										   writefln("got whitespace: `%s`", w.value.val);
+										   return false;
+										 },
+										 _ => true)
+									   ).array;
   writeln("lexed into tokens");
   writeln(tokens);
   /*  tokens ~= PayloadType(TokenType!lparen());

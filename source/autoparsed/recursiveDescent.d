@@ -4,8 +4,8 @@ import autoparsed.autoparsed;
 
 import std.stdio;
 
-import std.typecons : nullable, Nullable;
-import std.traits: ReturnType, Unqual, TemplateArgsOf, isInstanceOf, isType, hasUDA, getUDAs, allSameType, fullyQualifiedName;
+import std.typecons : nullable, Nullable, Tuple;
+import std.traits;
 import std.range.primitives;
 import sumtype;
 
@@ -52,11 +52,11 @@ if(hasUDA!(T, Lex) &&
 	if(parsed.isNull){
 	  return Nullable!T();
 	} else {
-	  return Nullable!T(T(parsed.get));
+	  return Nullable!T(construct!T(parsed.get));
 	}
   } else {
 	if(parsed){
-	  return Nullable!T(T(parsed));
+	  return Nullable!T(construct!T(parsed));
 	} else {
 	  return Nullable!T();
 	}
@@ -415,5 +415,116 @@ bool parseLiteral(Lit, TokenStream)(ref TokenStream tokenStream){
   return false;
 }
 
+template CArgs(T){
+  static assert(isType!T && isAggregateType!T);
+  static if(hasMember!(T, "__ctor")){
+	pragma(msg, T, " has a contructor");
+	alias CArgs = Parameters!(__traits(getMember, T, "__ctor"));
+	
+  } else {
+	pragma(msg, T, " doesn't have a constructor");
+	alias CArgs = Fields!T;
+  }
+}
+
+template ConstructableWith(T, Args...){
+  enum ConstructableWith = is(Tuple!(CArgs!T) == Tuple!Args);
+}
+
+
+
+template CommonValueType(T) if(isInstanceOf!(SumType, T)){
+  import std.meta : allSatisfy;
+  
+  template isValueToken(T){
+	static if(isInstanceOf!(TokenType,T)){
+	  enum isValueToken = !isType!(TemplateArgsOf!T[0]);
+	} else {
+	  enum isValueToken = false;
+	}
+  }
+  
+  enum allValueTokens = allSatisfy!(isValueToken, TemplateArgsOf!T);
+  pragma(msg, " are all value tokens? ", allValueTokens);
+  static if(allValueTokens){
+	
+	alias getValue(T)= TemplateArgsOf!T[0];
+	alias TokenValues = staticMap!(getValue, TemplateArgsOf!T);
+	alias getType(alias V) = typeof(V);
+	alias ValueTypes = staticMap!(getType, TokenValues);
+	pragma(msg, "Value Types", ValueTypes);
+	alias CT = CommonType!(ValueTypes);
+	static if(is(CT == void)){
+	  enum HasCommonType = false;
+	} else {
+	  enum HasCommonType = true;
+	  alias CommonValueType = CT;
+	}
+	
+  } else {
+	enum HasCommonType = false;
+  }
+  
+  pragma(msg, "has common type? ", HasCommonType);
+  static if(!HasCommonType){
+	alias CommonValueType = void;
+  }
+  
+}
+
+
+
+
+Target convert(Target, Src)(Src src){
+  import std.conv : to;
+  
+  static if(isInstanceOf!(SumType, Src)){
+	
+	//can a common type work for all the variants?
+	pragma(msg, "Checking compatibility, sumtype: ", Src);
+	alias CVT = CommonValueType!Src;
+	static assert(!is(CVT == void), "Can't pass a " ~ Src.stringof ~
+				  " as expected constructor argument type " ~ Target.stringof);
+	
+	CVT val = src.match!(x => x.value);
+	
+	return to!Target(val);
+	
+  } else static if(isArray!Target && isArray!Src){
+	import std.algorithm: map;
+	import std.array;
+	
+	return map!(convert!(ForeachType!Target, ForeachType!Src))(src).array;
+  } else {
+	return to!(Target)(src);
+  }
+  
+}
+
+
+
+T construct(T, Args...)(Args args){
+
+  pragma(msg, "Constructable? :", T, " Args: ", Args, " ? ");
+  pragma(msg, ConstructableWith!(T, Args));
+  static if(CArgs!T.length != Args.length){
+	static assert(false, "Wrong number of args provided.  T is constructable with " ~ CArgs!T.stringof
+				  ~ " but attempting to construct with " ~ Args.stringof); 
+  }
+  
+  static if(ConstructableWith!(T, Args)){
+	return T(args);
+  } else {
+	CArgs!T cargs;
+	static foreach(i, Arg; CArgs!T){
+	  static if(is(Arg == Args[i])){
+		cargs[i] = args[i];
+	  } else {
+		cargs[i] = convert!(Arg)(args[i]);
+	  }
+	}
+	return T(cargs);
+  }
+}
 
 pragma(msg, "end recursive descent module");

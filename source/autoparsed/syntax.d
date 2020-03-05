@@ -32,8 +32,8 @@ struct TokenType(alias T){
 
 ///PEG rule for picking between options
 struct OneOf(Ts...){
-  import std.traits: fullyQualifiedName, TemplateOf, isInstanceOf, isType;
-  import std.meta : staticMap;
+  import std.traits: fullyQualifiedName, TemplateOf, TemplateArgsOf, isInstanceOf, isType, CommonType;
+  import std.meta : staticMap, allSatisfy;
   
   static if(Ts.length < 2){
 	pragma(msg, "Warning: using OneOf to pick between "
@@ -53,6 +53,8 @@ struct OneOf(Ts...){
   }
 
   alias NodeType = SumType!(staticMap!(Wrap, Ts));
+
+  
 }
 
 ///PEG rule for "at least one"

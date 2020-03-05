@@ -42,15 +42,23 @@ template notModuleOrPackage(alias T){
 }
 
 template annotatedConstructors(alias T){
-  import std.meta : staticMap, Filter;
-  import std.traits : getUDAs, fullyQualifiedName, isType, hasUDA;
-
-  alias getSymbol(alias S) = __traits(getMember, T, S);
-  enum hasSyntaxUDA(alias S) = hasUDA!(S, Syntax);
-
-  alias members = staticMap!(getSymbol, __traits(allMembers, T));  
-  alias annotatedConstructors = Filter!(hasSyntaxUDA, members);
-
+  import std.meta : staticMap, Filter, AliasSeq;
+  import std.traits : getUDAs, fullyQualifiedName, isType, hasUDA, isInstanceOf;
+  pragma(msg, "AC for ", T);
+  enum isSyntax = isInstanceOf!(OneOf, T) ||
+	isInstanceOf!(RegexPlus, T) ||
+	isInstanceOf!(RegexStar, T) ||
+	isInstanceOf!(Optional, T) ||
+	isInstanceOf!(Not, T);
+  static if(isSyntax){
+	alias annotatedConstructors = AliasSeq!();
+  } else {
+	alias getSymbol(alias S) = __traits(getMember, T, S);
+	enum hasSyntaxUDA(alias S) = hasUDA!(S, Syntax);
+	
+	alias members = staticMap!(getSymbol, __traits(allMembers, T));  
+	alias annotatedConstructors = Filter!(hasSyntaxUDA, members);
+  }
 }
 
 
