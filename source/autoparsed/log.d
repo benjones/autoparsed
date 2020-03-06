@@ -5,6 +5,6 @@ public:
 mixin template CTLog(Args...){
   
   debug(AutoparsedCTLog){
-	pragma(msg, Args);
+    pragma(msg, Args);
   }
 }

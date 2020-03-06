@@ -19,10 +19,10 @@ struct TokenType(alias T){
   import std.traits : isType;
 
   static if(isType!T){
-	alias type = T;
-	T value;
+    alias type = T;
+    T value;
   } else {
-	enum value = T;
+    enum value = T;
   }
 }
 
@@ -33,20 +33,20 @@ struct OneOf(Ts...){
   import std.meta : staticMap, allSatisfy;
   
   static if(Ts.length < 2){
-	pragma(msg, "Warning: using OneOf to pick between "
-		   ~ Ts.length~ " options.  You should probably provide at least 2 options.");
+    pragma(msg, "Warning: using OneOf to pick between "
+           ~ Ts.length~ " options.  You should probably provide at least 2 options.");
 
-	static if(Ts.length ==1){
-	  pragma(msg, "type provided: " ~ fullyQualifiedName!Ts[0]);
-	}
+    static if(Ts.length ==1){
+      pragma(msg, "type provided: " ~ fullyQualifiedName!Ts[0]);
+    }
   }
   import sumtype;
   template Wrap(alias T){
-	static if(!isType!T) {
-	  alias Wrap = TokenType!T;
-	} else {
-	  alias Wrap = T;
-	}
+    static if(!isType!T) {
+      alias Wrap = TokenType!T;
+    } else {
+      alias Wrap = T;
+    }
   }
 
   alias NodeType = SumType!(staticMap!(Wrap, Ts));

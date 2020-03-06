@@ -33,18 +33,18 @@ template annotatedConstructors(alias T){
   import std.meta : staticMap, Filter, AliasSeq;
   import std.traits : getUDAs, fullyQualifiedName, isType, hasUDA, isInstanceOf;
   enum isSyntax = isInstanceOf!(OneOf, T) ||
-	isInstanceOf!(RegexPlus, T) ||
-	isInstanceOf!(RegexStar, T) ||
-	isInstanceOf!(Optional, T) ||
-	isInstanceOf!(Not, T);
+    isInstanceOf!(RegexPlus, T) ||
+    isInstanceOf!(RegexStar, T) ||
+    isInstanceOf!(Optional, T) ||
+    isInstanceOf!(Not, T);
   static if(isSyntax){
-	alias annotatedConstructors = AliasSeq!();
+    alias annotatedConstructors = AliasSeq!();
   } else {
-	alias getSymbol(alias S) = __traits(getMember, T, S);
-	enum hasSyntaxUDA(alias S) = hasUDA!(S, Syntax);
-	
-	alias members = staticMap!(getSymbol, __traits(allMembers, T));  
-	alias annotatedConstructors = Filter!(hasSyntaxUDA, members);
+    alias getSymbol(alias S) = __traits(getMember, T, S);
+    enum hasSyntaxUDA(alias S) = hasUDA!(S, Syntax);
+    
+    alias members = staticMap!(getSymbol, __traits(allMembers, T));  
+    alias annotatedConstructors = Filter!(hasSyntaxUDA, members);
   }
 }
 
@@ -54,8 +54,8 @@ template SyntaxRulesFromModule(alias Module){
   import std.traits: isType, isAggregateType, fullyQualifiedName;
 
   alias declarations = Filter!(isAggregateType,
-							   Filter!(isType,
-									   Filter!(notModuleOrPackage, symbolsFromModule!Module)));
+                               Filter!(isType,
+                                       Filter!(notModuleOrPackage, symbolsFromModule!Module)));
   
   alias SyntaxRulesFromModule = staticMap!(annotatedConstructors, declarations);
 }
@@ -63,7 +63,7 @@ template SyntaxRulesFromModule(alias Module){
 template RuleToPegString(alias Constructor){
   import std.traits: getUDAs;
   enum RuleToPegString = __traits(identifier, __traits(parent, Constructor)) ~ " <- " ~
-	FormatSyntax!(getUDAs!(Constructor, Syntax)[0]);
+    FormatSyntax!(getUDAs!(Constructor, Syntax)[0]);
 }
 
 
@@ -83,16 +83,16 @@ template FormatExpression(alias S) {
   import std.array : join;
 
   static if(!isType!S){
-	enum FormatExpression = "`" ~ S ~ "`";
+    enum FormatExpression = "`" ~ S ~ "`";
   } else static if(is(typeof(TemplateOf!S))) {
 
-	alias tArgs = TemplateArgsOf!S;
-	alias recurse(alias T) = FormatExpression!T;
-	
-	enum fp = [staticMap!(recurse, tArgs)];
-	enum joinedParts = join(fp, ", ");
-	enum FormatExpression = __traits(identifier, S) ~ "(" ~ joinedParts ~ ")";
+    alias tArgs = TemplateArgsOf!S;
+    alias recurse(alias T) = FormatExpression!T;
+    
+    enum fp = [staticMap!(recurse, tArgs)];
+    enum joinedParts = join(fp, ", ");
+    enum FormatExpression = __traits(identifier, S) ~ "(" ~ joinedParts ~ ")";
   } else {
-	enum FormatExpression = __traits(identifier, S);
+    enum FormatExpression = __traits(identifier, S);
   }
 }

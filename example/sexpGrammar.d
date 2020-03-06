@@ -1,9 +1,9 @@
 /**
-Example of how to use autoparsed to define a grammar for S-Expressions
-It also shows how to annotate tokens so they work with [autoparsed.Lexer].
+   Example of how to use autoparsed to define a grammar for S-Expressions
+   It also shows how to annotate tokens so they work with [autoparsed.Lexer].
 
-The annotations are based on PEG grammars.
- **/
+   The annotations are based on PEG grammars.
+**/
 module sexpGrammar;
 
 import autoparsed.autoparsed;
@@ -36,13 +36,13 @@ class Sexp {
 public:
   @Syntax!(lparen, RegexPlus!(OneOf!(Atom, Sexp)), rparen)
   this(SumType!(Atom, Sexp)[] members_){
-	members = members_;
+    members = members_;
   }
 
   override string toString() {
-	import std.array : join;
-	import std.algorithm : map;
-	return "Sexp( " ~ join(map!(a => a.toString)(members), ", ") ~ ")";
+    import std.array : join;
+    import std.algorithm : map;
+    return "Sexp( " ~ join(map!(a => a.toString)(members), ", ") ~ ")";
   }
 private:
   SumType!(Atom, Sexp)[] members;

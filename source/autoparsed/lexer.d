@@ -8,7 +8,7 @@ module autoparsed.lexer;
    For tokens of struct type, they can be annotated with [autoparsed.syntax.Lex] using the normal autoparsed syntax rules
    See the [sexp example](sexpGrammar.html) for reference.
 
- **/
+**/
 struct Lexer(alias Mod){
 
   import autoparsed.syntax;
@@ -28,25 +28,25 @@ struct Lexer(alias Mod){
 
   ///
   this(const(char)[] bytes){
-	bytes_ = bytes;
-	popFront();
+    bytes_ = bytes;
+    popFront();
   }
   ///
   bool empty(){
-	return front_.isNull;
+    return front_.isNull;
   }
 
   ///return the next token in the stream
   auto front(){
-	import std.traits : TemplateArgsOf;
+    import std.traits : TemplateArgsOf;
 
-	return front_.get();
+    return front_.get();
   }
   ///
   void popFront(){
-	import autoparsed.recursivedescent;
-	//should never be called when empty bc of rules of ranges
-	front_ = parse!parseRule(bytes_);
+    import autoparsed.recursivedescent;
+    //should never be called when empty bc of rules of ranges
+    front_ = parse!parseRule(bytes_);
   }
   
 private:
