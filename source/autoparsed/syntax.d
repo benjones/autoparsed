@@ -1,6 +1,5 @@
 module autoparsed.syntax;
 
-pragma(msg, "starting syntax module");
 ///UDA type for annotating constructors as grammar rules
 struct Syntax(T...){
   alias Elements = T;
@@ -15,16 +14,14 @@ struct Lex(T...){
 ///UDA type for annotating that a type or enum is a token
 enum Token;
 
+///Wrapper type necessary for value tokens '(', ')', whitespace, etc
 struct TokenType(alias T){
-  import std.traits : isType, fullyQualifiedName;
-  pragma(msg, "token type instantiation for " ~ fullyQualifiedName!T);
+  import std.traits : isType;
 
   static if(isType!T){
-	pragma(msg, "type");
 	alias type = T;
 	T value;
   } else {
-	pragma(msg, "not a type");
 	enum value = T;
   }
 }
@@ -75,4 +72,3 @@ struct Optional(T...){
 struct Not(T...){
 
 }
-pragma(msg, "end syntax module");

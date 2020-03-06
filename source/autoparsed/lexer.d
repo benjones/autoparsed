@@ -6,6 +6,7 @@ struct Lexer(alias Mod){
 
   import autoparsed.syntax;
   import autoparsed.autoparsed;
+  import autoparsed.log;
   
   import std.range.primitives;
 
@@ -14,13 +15,10 @@ struct Lexer(alias Mod){
   import sumtype;
   import std.typecons : Nullable;
 
-  pragma(msg, "lexer for module: ", fullyQualifiedName!Mod);
-  pragma(msg, "lexer token types: ");
-  pragma(msg, tokenTypes!Mod);
+  mixin CTLog!("lexer for module: ", fullyQualifiedName!Mod);
   alias parseRule = OneOf!(tokenTypes!Mod);
-  pragma(msg, "lexer parse rule");
-  pragma(msg, parseRule);
-  
+  mixin CTLog!("lexer parse rule types: ", parseRule);  
+
   this(const(char)[] bytes){
 	bytes_ = bytes;
 	popFront();
