@@ -1,3 +1,9 @@
+/**
+Example of how to use autoparsed to define a grammar for S-Expressions
+It also shows how to annotate tokens so they work with [autoparsed.Lexer].
+
+The annotations are based on PEG grammars.
+ **/
 module sexpGrammar;
 
 import autoparsed.autoparsed;
@@ -5,6 +11,8 @@ import autoparsed.lexer;
 import autoparsed.syntax;
 
 import sumtype;
+
+
 
 @Token
 enum lparen = '(';

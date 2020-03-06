@@ -6,6 +6,7 @@
     "description": "Auto generate a parse from node types with simple annotations",
     "license": "MIT",
     "name": "autoparsed",
+    "dflags-dmd" : ["-preview=markdown"],
     "subPackages" : ["example"],
     "dependencies" : {
         "sumtype" : "~>0.9.4"
