@@ -3,5 +3,9 @@
 
 ((d-mode
   (indent-tabs-mode nil )
-  (c-basic-offset . 2)))
+  (c-basic-offset . 2)
+  (c-file-offsets
+   (arglist-intro . +)
+   (topmost-intro-cont . 0))
+  ))
 
