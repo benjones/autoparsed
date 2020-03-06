@@ -6,9 +6,6 @@ import autoparsed.syntax;
 
 import sumtype;
 
-
-pragma(msg, "parsing sexpgrammar module");
-
 @Token
 enum lparen = '(';
 
@@ -43,4 +40,3 @@ private:
   SumType!(Atom, Sexp)[] members;
 }
 
-pragma(msg, "end parsing sexpgrammar module");
