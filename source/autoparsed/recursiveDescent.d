@@ -32,6 +32,8 @@ if(hasUDA!(T, Lex) &&
 
   alias uda = getUDAs!(T, Lex);
   mixin CTLog!("Parser for Lexable token `", T, "` with UDA `", uda, "`");
+
+  RTLog("parsing lexable token `", T.stringof, "` from stream: ", tokenStream);
   
   auto parsed = parse!(TemplateArgsOf!uda)(tokenStream);
 
@@ -57,18 +59,17 @@ if(hasUDA!(T, Token) &&
    partOfStream!(T, typeof(tokenStream.front()))){
   
   mixin CTLog!("Parser for already lexed Token `", T, "` from stream of type `", TokenStream, "`");
+  RTLog("parsing token `", T.stringof, "` from stream: ", tokenStream);
 
-  writeln("parsing token ", T.stringof, " from stream ", tokenStream);
   if(tokenStream.empty) return Nullable!T();
   return tokenStream.front.match!(
     (TokenType!T t){
       auto ret = t.value.nullable;
       tokenStream.popFront;
-      writeln("matched token, returning ", ret);
       return ret;
     },
     _ => Nullable!T()
-  );
+                                  );
 
 }
 
@@ -93,24 +94,15 @@ if(annotatedConstructors!(T).length > 0) {
   import std.traits : getUDAs, isType, Parameters;
   import std.meta : staticMap;
 
-
-  writeln("parsing ", T.stringof, " token stream: ", tokenStream);
-
   alias ac = annotatedConstructors!T;
   alias syntax = getUDAs!(ac, Syntax)[0];
+
   mixin CTLog!("Parser for type `", T, "` with annotated constructor syntax`", syntax, "`");
-
-  /*static foreach(i, x; TemplateArgsOf!syntax){
-    pragma(msg, fullyQualifiedName!(TemplateArgsOf!syntax[i]));
-    }*/
-
+  RTLog("parsing token `", T.stringof, "` with annotated constructor from stream: ", tokenStream);
 
   alias Args = Parameters!(annotatedConstructors!(T)[0]);
-  //pragma(msg, "constructor args: ");
-  //pragma(msg, Args);
   alias Seq = Sequence!(TemplateArgsOf!syntax);
-  //pragma(msg, "seq:");
-  //pragma(msg, Seq);
+
   auto parsed =  parse!Seq(tokenStream);
   if(parsed.isNull){
     return null;
@@ -123,8 +115,10 @@ if(annotatedConstructors!(T).length > 0) {
 ///parse a * expression (0 or more repeats)
 auto parse(RS, TokenStream)(ref TokenStream tokenStream)
 if(isInstanceOf!(RegexStar, RS)){
-  writeln("parsing regex star ", RS.stringof, " token stream: ", tokenStream);
+
   mixin CTLog!("Parser for RegexStar `", RS, "`");
+  RTLog("parsing `", RS.stringof, "` from stream: ", tokenStream);
+
 
   alias Elems = TemplateArgsOf!RS;
   static if(Elems.length > 1){
@@ -135,8 +129,6 @@ if(isInstanceOf!(RegexStar, RS)){
   TokenStream copy = tokenStream;
   auto elem = parse!ElemType(copy);
   static if(isInstanceOf!(Nullable, typeof(elem))){
-    //  pragma(msg, "nullable elem type: ");
-    //  pragma(msg, ElemType);
     alias RetType = TemplateArgsOf!(typeof(elem))[0];
   } else {
     alias RetType = typeof(elem);
@@ -144,30 +136,20 @@ if(isInstanceOf!(RegexStar, RS)){
   }
   
   RetType[] ret;
-  /*  pragma(msg, "RS parser, ret type:");
-  pragma(msg, RetType);
-  pragma(msg, "typeof elem");
-  pragma(msg, typeof(elem));
-  pragma(msg, "typeof ret");
-  pragma(msg, typeof(ret));
-  pragma(msg, "typeof RetType[]");
-  pragma(msg, RetType[]);*/
   while(!isNullish(elem)){
-    writeln("elem not nullish: ", elem);
-    writeln("trying to append a ", typeof(elem).stringof, " to a ", typeof(ret).stringof);
     static if(isInstanceOf!(Nullable, typeof(elem))){
       ret ~= elem.get;
     } else {
       ret ~= elem;
     }
-    writeln("appended elem to ret in regexstar: ", ret);
     elem = parse!ElemType(copy);
   }
 
   if(ret.length > 0){
     tokenStream = copy; //something was consumed
   }
-  writeln("regex star returning: ", ret, " stream is ", tokenStream);
+
+  RTLog("regex star returning: `", ret, "` with stream: ", tokenStream);
   return ret;
 }
 
@@ -175,14 +157,12 @@ if(isInstanceOf!(RegexStar, RS)){
 auto parse(RP, TokenStream)(ref TokenStream tokenStream)
 if(isInstanceOf!(RegexPlus, RP)){
 
-  writeln("parsing regex plus ", RP.stringof, " token stream: ", tokenStream);
-
   mixin CTLog!("Parser for RegexPlus `", RP, "`");
-
+  RTLog("parsing `", RP.stringof, "` from stream: ", tokenStream);
+  
   alias StarType = RegexStar!(TemplateArgsOf!RP);
   auto ret = parse!(StarType)(tokenStream);
-  //  pragma(msg, "RP got this type back from RS: ");
-  //  pragma(msg, typeof(ret));
+
   return ret.length > 0 ? ret : null;
 }
 
@@ -190,34 +170,30 @@ if(isInstanceOf!(RegexPlus, RP)){
 auto parse(OO, TokenStream)(ref TokenStream tokenStream)
 if(isInstanceOf!(OneOf, OO)){
   import std.typecons : nullable;
-  
-  writeln("parsing one of ", OO.stringof, " token stream: ", tokenStream);
 
   mixin CTLog!("Parser for OneOf `", OO, "`");
+  RTLog("parsing `", OO.stringof, "` from stream: ", tokenStream);
 
   alias Ts = TemplateArgsOf!(OO.NodeType);
   static foreach(T; Ts){{
       TokenStream copy = tokenStream; //only advance the stream on success
-      writeln("trying option: ", T.stringof);
       auto res = parse!T(copy);
 
-      /*pragma(msg, "\nrestype");
-      pragma(msg, typeof(res));
-      pragma(msg, isInstanceOf!(Nullable, res));
-      */
-      
       static if(isInstanceOf!(Nullable, typeof(res))){
         if(!res.isNull){
-          writeln("res Nullable and not nullish: ", res);
           auto ret = nullable(OneOf!(Ts).NodeType(res.get));
-          writeln("returning ", ret, " with type ", typeof(ret).stringof);
           tokenStream = copy;
+          RTLog("one of successfully parsed ` ", ret,
+                "` with type `", typeof(ret).stringof, "` with stream: ", tokenStream);
+
           return ret;
         }
       } else {
         if(res !is null){
-          writeln("res pointer like and not nullish: ", res);
           tokenStream = copy;
+
+          RTLog("one of successfully parsed ` ", res,
+                "` with type `", typeof(res).stringof, "` with stream: ", tokenStream);
           return nullable(OneOf!(Ts).NodeType(res));
         }
       }
@@ -231,6 +207,7 @@ bool parse(N, TokenStream)(ref TokenStream tokenStream)
 if(isInstanceOf!(Not, N)){
 
   mixin CTLog!("Parser for Not `", N, "`");
+  RTLog("parsing Not element, `", N.stringof, "`, from stream: ", tokenStream);
   
   TokenStream copy = tokenStream; //don't consume any input
   return isNullish(parse!(TemplateArgsOf!N)(copy));
@@ -240,7 +217,8 @@ if(isInstanceOf!(Not, N)){
 ///returns the next token, whatever it is
 auto parse(T: Token, TokenStream)(ref TokenStream tokenStream){
   mixin CTLog!("Parser for wildcard token");
-  
+  RTLog("parsing wildcard token from stream: ", tokenStream);
+
   alias U = typeof(tokenStream.front());
   if(tokenStream.empty){ return Nullable!U(); }
   
@@ -254,6 +232,7 @@ auto parse(S, TokenStream)(ref TokenStream tokenStream)
 if(isInstanceOf!(Sequence, S)){
 
   mixin CTLog!("Parser for Sequence `", S, "`");
+  RTLog("parsing `", S.stringof, "` from stream: ", tokenStream);
   
   import std.typecons : Tuple;
   import std.meta : Filter, staticMap, ReplaceAll;
@@ -268,8 +247,6 @@ if(isInstanceOf!(Sequence, S)){
   }
   Nullable!RetType ret;
 
-  //  pragma(msg, "RetType: ");
-  //  pragma(msg, RetType);
   
   static size_t argNumber(size_t syntaxNumber)(){
     size_t v = 0;
@@ -291,20 +268,7 @@ if(isInstanceOf!(Sequence, S)){
   }
 
   TokenStream copy = tokenStream; //don't advance on failure
-  writeln("parsing sequence: ", S.stringof, " from stream ", tokenStream);
   static foreach(i, elem; Ts){{
-      /*    pragma(msg, "parse ");
-    pragma(msg, elem);
-    pragma(msg, "corresponding to arg number");
-    pragma(msg, argNumber!i);
-    pragma(msg, "with type");
-    static if(isInstanceOf!(Tuple, RetType)){
-      pragma(msg, typeof(ret[argNumber!i]));
-    } else {
-      pragma(msg, typeof(ret));
-    }
-
-      */
     static if(isType!elem){
 
       static if(isInstanceOf!(Not, elem)){
@@ -328,8 +292,6 @@ if(isInstanceOf!(Sequence, S)){
         return Nullable!RetType();
       }
     }
-    //  pragma(msg, "done with");
-    //  pragma(msg, elem);
   }}
 
   tokenStream = copy;
@@ -358,17 +320,14 @@ template ValueType(T){
 bool check(alias S, TokenStream)(ref TokenStream tokenStream){
   import std.range;
 
-  writeln("checking ", S.stringof, " on tokens ", tokenStream);
-
   mixin CTLog!("Parser(check) for literal `", S, "`");
-
+  RTLog("parsing(checking) for `", S.stringof, "` from stream: ", tokenStream);
+  
   if(tokenStream.empty) return false;
-  writeln("actual token ", tokenStream.front, " wanted ", (TokenType!S).stringof);
   
   return tokenStream.front.match!(
     (TokenType!S t) {
       tokenStream.popFront();
-      writeln("check OK");
       return true;
     },
     _ => false);
@@ -376,8 +335,6 @@ bool check(alias S, TokenStream)(ref TokenStream tokenStream){
   
 bool isNullish(T)(const auto ref T t){
   import std.traits : isPointer, isDynamicArray;
-  //  pragma(msg, "\nnullish");
-  //  pragma(msg, T);
   static if(isInstanceOf!(Nullable, T)){
     return t.isNull();
   }  else static if(isPointer!T){
@@ -393,12 +350,12 @@ bool isNullish(T)(const auto ref T t){
 
 ///Is a literal at the front?
 bool parseLiteral(Lit, TokenStream)(ref TokenStream tokenStream){
-  writeln("checking for literal ", Lit.stringof , " at front of stream: ", tokenStream);
   mixin CTLog!("Parse(non-check) literal `", Lit, "`");
+  RTLog("parsing(non-check) for `", Lit.stringof, "` from stream: ", tokenStream);
+
   if(tokenStream.empty()){ return false; }
   if(tokenStream.front == Lit.value){
     tokenStream.popFront;
-    writeln("got it");
     return true;
   }
   return false;
@@ -424,7 +381,7 @@ template ConstructableWith(T, Args...){
 
 template CommonValueType(T) if(isInstanceOf!(SumType, T)){
   import std.meta : allSatisfy;
-  
+
   template isValueToken(T){
     static if(isInstanceOf!(TokenType,T)){
       enum isValueToken = !isType!(TemplateArgsOf!T[0]);
@@ -432,11 +389,11 @@ template CommonValueType(T) if(isInstanceOf!(SumType, T)){
       enum isValueToken = false;
     }
   }
-  
+
   enum allValueTokens = allSatisfy!(isValueToken, TemplateArgsOf!T);
   //  pragma(msg, " are all value tokens? ", allValueTokens);
   static if(allValueTokens){
-    
+
     alias getValue(T)= TemplateArgsOf!T[0];
     alias TokenValues = staticMap!(getValue, TemplateArgsOf!T);
     alias getType(alias V) = typeof(V);
@@ -449,16 +406,15 @@ template CommonValueType(T) if(isInstanceOf!(SumType, T)){
       enum HasCommonType = true;
       alias CommonValueType = CT;
     }
-    
+
   } else {
     enum HasCommonType = false;
   }
-  
+
   //  pragma(msg, "has common type? ", HasCommonType);
   static if(!HasCommonType){
     alias CommonValueType = void;
   }
-  
 }
 
 
@@ -466,28 +422,26 @@ template CommonValueType(T) if(isInstanceOf!(SumType, T)){
 
 Target convert(Target, Src)(Src src){
   import std.conv : to;
-  
+
   static if(isInstanceOf!(SumType, Src)){
-    
+
     //can a common type work for all the variants?
     //  pragma(msg, "Checking compatibility, sumtype: ", Src);
     alias CVT = CommonValueType!Src;
     static assert(!is(CVT == void), "Can't pass a " ~ Src.stringof ~
                   " as expected constructor argument type " ~ Target.stringof);
-    
+
     CVT val = src.match!(x => x.value);
-    
     return to!Target(val);
-    
+
   } else static if(isArray!Target && isArray!Src){
     import std.algorithm: map;
     import std.array;
-    
+
     return map!(convert!(ForeachType!Target, ForeachType!Src))(src).array;
   } else {
     return to!(Target)(src);
   }
-  
 }
 
 
@@ -500,7 +454,7 @@ T construct(T, Args...)(Args args){
     static assert(false, "Wrong number of args provided.  T is constructable with " ~ CArgs!T.stringof
                   ~ " but attempting to construct with " ~ Args.stringof); 
   }
-  
+
   static if(ConstructableWith!(T, Args)){
     return T(args);
   } else {
