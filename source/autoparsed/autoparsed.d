@@ -1,7 +1,7 @@
 module autoparsed.autoparsed;
 
 public import autoparsed.syntax;
-
+import autoparsed.log;
 
 template symbolsFromModule(alias Module){
   import std.meta : staticMap;
@@ -32,11 +32,13 @@ template notModuleOrPackage(alias T){
 template annotatedConstructors(alias T){
   import std.meta : staticMap, Filter, AliasSeq;
   import std.traits : getUDAs, fullyQualifiedName, isType, hasUDA, isInstanceOf;
-  enum isSyntax = isInstanceOf!(OneOf, T) ||
+  enum isSyntax = isInstanceOf!(Sequence, T) ||
+    isInstanceOf!(OneOf, T) ||
     isInstanceOf!(RegexPlus, T) ||
     isInstanceOf!(RegexStar, T) ||
     isInstanceOf!(Optional, T) ||
     isInstanceOf!(Not, T);
+
   static if(isSyntax){
     alias annotatedConstructors = AliasSeq!();
   } else {

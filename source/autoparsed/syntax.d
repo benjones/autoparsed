@@ -69,6 +69,13 @@ struct Optional(T...){
   
 }
 
+///PEG rule that is satisfied if the next token is Not any of the Ts
 struct Not(T...){
 
 }
+
+// for internal use to handle sequences of tokens
+package struct Sequence(Ts...){
+  alias Elements = Ts;
+}
+

@@ -22,7 +22,7 @@ template partOfStream(T, TArgs){
 }
 
 
-///parse an lexable token from a tokenStream
+///parse a lexable token from a tokenStream
 ///If the stream can return this token, this doesn't apply
 ///This is used by the lexer
 Nullable!T parse(T, TokenStream)(ref TokenStream tokenStream)
@@ -34,8 +34,14 @@ if(hasUDA!(T, Lex) &&
   mixin CTLog!("Parser for Lexable token `", T, "` with UDA `", uda, "`");
 
   RTLog("parsing lexable token `", T.stringof, "` from stream: ", tokenStream);
-  
-  auto parsed = parse!(TemplateArgsOf!uda)(tokenStream);
+
+  alias tArgs = TemplateArgsOf!uda;
+  static if(tArgs.length > 1){
+    alias parseType = Sequence!(tArgs);
+  } else {
+    alias parseType = tArgs;
+  }
+  auto parsed = parse!(parseType)(tokenStream);
 
   static if(isInstanceOf!(Nullable, typeof(parsed))){
     if(parsed.isNull){
@@ -73,17 +79,19 @@ if(hasUDA!(T, Token) &&
 
 }
 
-///Pare a token, forwards either to another overload, or the literal checker
+///Parse a token, forwards either to another overload, or the literal checker
 Nullable!T parse(T, TokenStream)(ref TokenStream tokenStream)
 if(isInstanceOf!(TokenType, T)){
   import std.traits: isType;
   mixin CTLog!("Forwarding Parser for TokenType wrapper `", T, "`");
 
-  static if(isType!(TemplateArgsOf!T)){
+  alias TArgs = TemplateArgsOf!T;
+
+  static if(isType!(TArgs)){
     auto res = parse!(TemplateArgsOf!T)(tokenStream);
     return res.isNull ? Nullable!T() : Nullable!T(T(res.get));
   } else {
-    return parseLiteral!T(tokenStream) ? Nullable!T(T()) : Nullable!T();
+    return parse!TArgs(tokenStream) ? Nullable!T(T()) : Nullable!T();
   }
 
 }
@@ -119,13 +127,15 @@ if(isInstanceOf!(RegexStar, RS)){
   mixin CTLog!("Parser for RegexStar `", RS, "`");
   RTLog("parsing `", RS.stringof, "` from stream: ", tokenStream);
 
-
   alias Elems = TemplateArgsOf!RS;
   static if(Elems.length > 1){
     alias ElemType = Sequence!(Elems);
   } else {
     alias ElemType = Elems[0];
   }
+
+  mixin CTLog!("Elem type: `", ElemType, "`");
+
   TokenStream copy = tokenStream;
   auto elem = parse!ElemType(copy);
   static if(isInstanceOf!(Nullable, typeof(elem))){
@@ -210,7 +220,9 @@ if(isInstanceOf!(Not, N)){
   RTLog("parsing Not element, `", N.stringof, "`, from stream: ", tokenStream);
   
   TokenStream copy = tokenStream; //don't consume any input
-  return isNullish(parse!(TemplateArgsOf!N)(copy));
+  auto ret = isNullish(parse!(TemplateArgsOf!N)(copy));
+  RTLog("returning from Not element, `", N.stringof, "`, from stream: ", tokenStream, " with ", ret);
+  return ret;
 
 }
 
@@ -227,7 +239,7 @@ auto parse(T: Token, TokenStream)(ref TokenStream tokenStream){
   return nullable(ret);
 }
 
-///parse a sequence of tokens in order
+///parse a sequence of tokens in orders
 auto parse(S, TokenStream)(ref TokenStream tokenStream)
 if(isInstanceOf!(Sequence, S)){
 
@@ -235,16 +247,20 @@ if(isInstanceOf!(Sequence, S)){
   RTLog("parsing `", S.stringof, "` from stream: ", tokenStream);
   
   import std.typecons : Tuple;
-  import std.meta : Filter, staticMap, ReplaceAll;
+  import std.meta : ReplaceAll;
   
   alias Ts = S.Elements;
-  alias TsWithValues = Filter!(hasValue, Ts);
-  alias Values = ReplaceAll!(Token, typeof(tokenStream.front()), staticMap!(ValueType, TsWithValues));
+  alias TType = ElementType!TokenStream;
+  alias TokensReplaced = ReplaceTokensRecursive!(TType, Ts);
+  alias Values = ValueTypes!TokensReplaced;
+
+  mixin CTLog!(S, ": values: ", Values);
   static if(Values.length > 1){
     alias RetType = Tuple!(Values);
   } else {
     alias RetType = Values[0];
   }
+  mixin CTLog!(S, ": Ret type: ", RetType);
   Nullable!RetType ret;
 
   
@@ -277,7 +293,7 @@ if(isInstanceOf!(Sequence, S)){
         }
       } else {
         auto x = parse!(elem)(copy);
-
+        mixin CTLog!(S, ": typeof x: ", typeof(x));
         //an empty array from regexStar is OK
         static if(!isInstanceOf!(RegexStar, elem)){
           if(isNullish(x)){
@@ -298,20 +314,29 @@ if(isInstanceOf!(Sequence, S)){
   return ret;
 }
 
-struct Sequence(Ts...){
-  alias Elements = Ts;
-}
 
 template hasValue(alias T){
   enum hasValue = isType!T && !isInstanceOf!(Not, T);
 }
 
-template ValueType(T){
+template ValueTypes(Ts...){
+
+  import std.meta : staticMap, Filter;
+
+  alias TsWithValues = Filter!(hasValue, Ts);
+  alias ValueTypes = staticMap!(ValueType, TsWithValues);
+}
+
+template ValueType(alias T){
+
   static if(isInstanceOf!(OneOf, T)){
     alias ValueType = T.NodeType;
+
   } else static if(isInstanceOf!(RegexStar, T) || isInstanceOf!(RegexPlus, T)){
-    alias ValueType = ValueType!(TemplateArgsOf!T)[];
+    alias ChildType = ValueTypes!(TemplateArgsOf!T);
+    alias ValueType = SliceOf!ChildType;
   } else {
+    mixin CTLog!("val type neither");
     alias ValueType = T;
   }
 }
@@ -324,13 +349,21 @@ bool check(alias S, TokenStream)(ref TokenStream tokenStream){
   RTLog("parsing(checking) for `", S.stringof, "` from stream: ", tokenStream);
   
   if(tokenStream.empty) return false;
-  
-  return tokenStream.front.match!(
-    (TokenType!S t) {
+  static if(isInstanceOf!(SumType, typeof(tokenStream.front()))){
+    return tokenStream.front.match!(
+      (TokenType!S t) {
+        tokenStream.popFront();
+        return true;
+      },
+      _ => false);
+  } else {
+    if(tokenStream.front == S){
       tokenStream.popFront();
       return true;
-    },
-    _ => false);
+    } else {
+      return false;
+    }
+  }
 }
   
 bool isNullish(T)(const auto ref T t){
@@ -342,23 +375,28 @@ bool isNullish(T)(const auto ref T t){
   } else static if(isDynamicArray!T){
     return t.length == 0;
   } else {
-    return t;
+    return !t;
   }
 }
 
 
 
 ///Is a literal at the front?
-bool parseLiteral(Lit, TokenStream)(ref TokenStream tokenStream){
+bool parse(alias Lit, TokenStream)(ref TokenStream tokenStream){
   mixin CTLog!("Parse(non-check) literal `", Lit, "`");
-  RTLog("parsing(non-check) for `", Lit.stringof, "` from stream: ", tokenStream);
+  RTLog("parsing(non-check) for `", Lit.stringof, "` with type ", typeof(Lit).stringof," from stream: ", tokenStream);
 
-  if(tokenStream.empty()){ return false; }
-  if(tokenStream.front == Lit.value){
+  if(tokenStream.empty()){
+    RTLog("stream empty, returning false");
+    return false; }
+  if(tokenStream.front == Lit){
+    RTLog("found it, returning true");
     tokenStream.popFront;
     return true;
+  } else {
+    RTLog("didn't find it, returning false");
+    return false;
   }
-  return false;
 }
 
 template CArgs(T){
@@ -470,3 +508,42 @@ T construct(T, Args...)(Args args){
   }
 }
 
+template ReplaceTokenRecursive(Replacement, alias T)
+if(!isType!T){
+  alias ReplaceTokenRecursive = T;
+ }
+
+template ReplaceTokenRecursive(Replacement, T){
+  static if(isType!T){
+    static if(is(TemplateArgsOf!T)){
+      alias Ts = TemplateArgsOf!T;
+      alias Temp = TemplateOf!T;
+      alias ReplaceTokenRecursive = Temp!(ReplaceTokensRecursive!(Replacement, Ts));
+    } else {
+      static if(is(T == Token)){
+        alias ReplaceTokenRecursive = Replacement;
+      } else {
+        alias ReplaceTokenRecursive = T;
+      }
+    }
+  } else {
+    alias ReplaceTokenRecursive = T;
+  }
+}
+
+template ReplaceTokensRecursive(Replacement, Ts...){
+  import std.meta : staticMap;
+  alias F(alias T) = ReplaceTokenRecursive!(Replacement, T);
+  alias ReplaceTokensRecursive = staticMap!(F, Ts);
+
+}
+
+unittest {
+  static assert(is(ReplaceTokensRecursive!(dchar, '"', (RegexStar!(Not!'"', Token)), '"', "`") ==
+                   RegexStar!(Not!'"', dchar)));
+}
+
+
+template SliceOf(T){
+  alias SliceOf = T[];
+}

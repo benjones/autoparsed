@@ -1,10 +1,11 @@
 {
-    "name": "autoparsed_example",
+    "name": "example",
     "targetType": "executable",
     "sourcePaths": ["."],
+    "importPaths": ["."],
     "mainSourceFile": "main.d",
     "dependencies":
     {
         "autoparsed": { "version" : "*"}
-    }
+    },
 }
