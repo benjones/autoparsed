@@ -17,7 +17,16 @@ template tokensFromModule(alias Module){
 
 template tokenTypes(alias Module){
   import std.meta : staticMap;
-  alias tokenTypes = staticMap!(TokenType, tokensFromModule!Module);
+  import std.traits : isType;
+  
+  template wrap(alias T){
+    static if(!isType!T){
+      alias wrap = TokenType!T;
+    } else {
+      alias wrap = T;
+    }
+  }
+  alias tokenTypes = staticMap!(wrap, tokensFromModule!Module);
 }
 
 template TokenPayload(alias Module){

@@ -32,7 +32,7 @@ import sumtype;
 class Sexp {
 public:
   @Syntax!(lparen, RegexPlus!(OneOf!(Atom, Sexp)), rparen)
-  this(SumType!(Atom, Sexp)[] members_){
+  this(OneOf!(Atom, Sexp).NodeType[] members_){
     members = members_;
   }
 
@@ -42,6 +42,6 @@ public:
     return "Sexp( " ~ join(map!(a => a.toString)(members), ", ") ~ ")";
   }
 private:
-  SumType!(Atom, Sexp)[] members;
+  OneOf!(Atom, Sexp).NodeType[] members;
 }
 

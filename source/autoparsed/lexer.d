@@ -23,6 +23,7 @@ struct Lexer(alias Mod){
   import std.typecons : Nullable;
 
   mixin CTLog!("lexer for module: ", fullyQualifiedName!Mod);
+  mixin CTLog!("TT for mod: ", tokenTypes!Mod);
   alias parseRule = OneOf!(tokenTypes!Mod);
   mixin CTLog!("lexer parse rule types: ", parseRule);  
 
@@ -46,7 +47,16 @@ struct Lexer(alias Mod){
   void popFront(){
     import autoparsed.recursivedescent;
     //should never be called when empty bc of rules of ranges
-    front_ = parse!parseRule(bytes_);
+    auto pr = parse!parseRule(bytes_);
+    pragma(msg, "type of parse's return value in lexer popfront: ", typeof(pr));
+    if(pr.isParseError){
+      import std.stdio;
+      writeln("parse error in lexer: ", pr.getParseError.contents);
+      front_.nullify();
+    }
+    else
+
+      front_ = pr.getPayload.contents;
   }
   
 private:

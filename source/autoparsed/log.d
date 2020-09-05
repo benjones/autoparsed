@@ -5,7 +5,10 @@ public:
 mixin template CTLog(Args...){
   
   debug(AutoparsedCTLog){
+    
     pragma(msg, Args);
+    //    import std.array;
+    //    pragma(msg, [Args].join(", "));
   }
 }
 

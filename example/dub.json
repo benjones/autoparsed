@@ -4,6 +4,7 @@
     "sourcePaths": ["."],
     "importPaths": ["."],
     "mainSourceFile": "main.d",
+    "dflags-dmd" : [],
     "dependencies":
     {
         "autoparsed": { "version" : "*"}

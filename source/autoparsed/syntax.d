@@ -27,6 +27,11 @@ struct TokenType(alias T){
 }
 
 
+///Rule to literal that we want to keep.  Useful in conjunction with Optional.
+///By default, literals are checked, but don't don't return anything
+struct Keep(alias V){
+}
+
 ///PEG rule for picking between options
 struct OneOf(Ts...){
   import std.traits: fullyQualifiedName, TemplateOf, TemplateArgsOf, isInstanceOf, isType, CommonType;
@@ -49,8 +54,18 @@ struct OneOf(Ts...){
     }
   }
 
-  alias NodeType = SumType!(staticMap!(Wrap, Ts));
-
+  alias WrappedTypes = staticMap!(Wrap, Ts);
+  
+  struct NodeType{
+    alias ST = SumType!WrappedTypes;
+    ST data;
+    alias data this;
+    static foreach(WT; WrappedTypes){
+      this(WT wt){
+        data = wt;
+      }
+    }
+  }
   
 }
 
@@ -79,3 +94,21 @@ package struct Sequence(Ts...){
   alias Elements = Ts;
 }
 
+
+/*
+
+  Types of things we want to parse, and what we expect them to return:
+
+  Lexable Token -> Token //like a normal syntax tagged type, I guess
+  Token -> Token
+  TokenType -> Token?
+  @Syntax object -> that object
+  * -> object[]
+  + -> object[] of length 1+
+  Optional -> Arg or nothing, either is fine
+  Choice -> one of the options, or error
+  Not -> nothing or error
+  Sequence -> tuple of args or nothing
+  Literals (tokens?) -> token or error
+
+ */
