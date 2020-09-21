@@ -33,7 +33,7 @@ import sumtype;
 
   //regex for a number -?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?
   //I'm allowing leading 0s because who cares, todo: scientific notation
-  @Lex!(Optional!(Keep!('-')), RegexPlus!Digit) //, Optional!(Keep!('.'), RegexPlus!Digit))
+  @Lex!(Optional!('-'), RegexPlus!Digit) //, Optional!(Keep!('.'), RegexPlus!Digit))
     struct Number{
       this(string rep){
         RTLog("making Number from `", rep, "`");

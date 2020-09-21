@@ -111,4 +111,5 @@ package struct Sequence(Ts...){
   Sequence -> tuple of args or nothing
   Literals (tokens?) -> token or error
 
+  keep?
  */

@@ -15,10 +15,13 @@ template TypesOnly(T...){
   alias TypesOnly = Filter!(isType, T);
 }
 
-struct Payload(T){
-  alias Types = T;
-  static if(!is(T == void))
-    T contents;
+struct Payload(T...){
+  static if(T.length == 1)
+    alias Types = T[0];
+  else
+    alias Types = T;
+  static if(!is(Types == void))
+    Types contents;
 }
 
 struct ParseError(T){
@@ -196,7 +199,8 @@ template SyntaxReturnType(T){
 SyntaxReturnType!T parse(T, TokenStream)(ref TokenStream tokenStream)
 if(annotatedConstructors!(T).length > 0) {
   import std.traits : getUDAs, isType, Parameters;
-  import std.meta : staticMap;
+  import std.range: iota;
+  import std.meta : Filter, staticMap, aliasSeqOf;
 
   alias ac = annotatedConstructors!T;
   alias syntax = getUDAs!(ac, Syntax)[0];
@@ -208,14 +212,50 @@ if(annotatedConstructors!(T).length > 0) {
   alias Seq = Sequence!(TemplateArgsOf!syntax);
   pragma(msg, "seq is: ", Seq);
   auto parsed =  parse!Seq(tokenStream);
-  pragma(msg, "typeof parsed payload in @syntax parser: ", ElementType!(typeof(parsed).PayloadType.Types).ST);
+  pragma(msg, "typeof parsed payload in @syntax parser: ", typeof(parsed));
+
+  alias ParsedPayloadType = typeof(parsed).PayloadType.Types;
+  pragma(msg, "Parsed PayloadTYpe: ", ParsedPayloadType);
+
+  auto getIndices(){
+    size_t[] ret;
+    static foreach(i, PT; ParsedPayloadType){{
+      static if(!is(PT == TokenType!X, alias X)){
+        ret ~= i;
+      }
+    }}
+    return ret;
+  }
+
+  alias valueIndices = aliasSeqOf!(getIndices());
+  /*
+  template notTokenType(size_t i){
+    //pragma(msg, "i: ", i, "ptt[i]: ", ParsedPayloadType[i]);
+    enum notTokenType = !isInstanceOf!(TokenType, ParsedPayloadType[i]);//== TokenType!Y, alias Y);
+  }
+  pragma(msg, "ITT[0]?", notTokenType!0, " PTT length: ", ParsedPayloadType.length);
+  
+
+  alias valueIndices = Filter!(notTokenType,aliasSeqOf!(iota(ParsedPayloadType.length)));
+  */
+  pragma(msg, "value indices: ", valueIndices);
+  
+  
+  alias getValueType(size_t ind) = ParsedPayloadType[ind];
+
+  
   alias PayloadType = Payload!T;
   alias RetType = ParseResult!(PayloadType, DefaultError);
   
   if(parsed.isParseError){
     return RetType(parsed.getParseError);
   } else {
-    return RetType(PayloadType(new T(parsed.getPayload.contents)));
+    alias ConstructorArgs = staticMap!(getValueType, valueIndices);
+    ConstructorArgs cArgs;
+    static foreach(cIndex, tIndex; valueIndices){
+      cArgs[cIndex] = parsed.getPayload.contents[tIndex];
+    }
+    return RetType(PayloadType(new T(cArgs)));
   }
 
 }
@@ -405,20 +445,24 @@ if(isInstanceOf!(Sequence, S)){
   RTLog("parsing `", S.stringof, "` from stream: ", tokenStream);
   
   import std.typecons : Tuple;
-  import std.meta : ReplaceAll;
+  import std.meta : ReplaceAll, Filter;
   
   alias Ts = S.Elements;
   alias TType = ElementType!TokenStream;
   alias TokensReplaced = ReplaceTokensRecursive!(TType, Ts);
   alias Values = ValueTypes!TokensReplaced;
 
-  mixin CTLog!(S, ": values: ", Values);
-  static if(Values.length > 1){
-    alias RetType = Tuple!(Values);
-  } else {
-    alias RetType = Values[0];
-  }
-  mixin CTLog!(S, ": Ret type: ", RetType);
+  //enum notTokenType(X) = !is(X : TokenType!Y, alias Y);
+  //alias Values = Filter!(notTokenType, ValuesWithLiterals);
+  
+
+  pragma(msg, S, ": values: ", Values);
+  //  static if(Values.length > 1){
+    alias RetType = Values;
+    //  } else {
+    //    alias RetType = Values[0];
+    //  }
+  pragma(msg, S, ": Ret type: ", RetType);
 
   RetType ret;
   alias PayloadType = Payload!RetType;
@@ -429,7 +473,7 @@ if(isInstanceOf!(Sequence, S)){
   static size_t argNumber(size_t syntaxNumber)(){
     size_t v = 0;
     static foreach(i; 0..syntaxNumber){
-      static if(hasValue!(Ts[i])){
+      static if(!is(Ts[i] == Not!X, X) ){ //hasValue!(Ts[i])){
         ++v;
       }
     }
@@ -438,9 +482,9 @@ if(isInstanceOf!(Sequence, S)){
 
   void set(size_t i, T)(T val){
     pragma(msg, "setting ", i, " with ", T);
-    static if(isInstanceOf!(Tuple, RetType)){
+    //    static if(isInstanceOf!(Tuple, RetType)){
       ret[i] = val;
-    } else {
+      /*} else {
       static assert(i == 0);
       pragma(msg, "typeof ret: ", typeof(ret), " typeof val: ", typeof(val));
       static if(is(typeof(ret) == typeof(val))){
@@ -453,7 +497,7 @@ if(isInstanceOf!(Sequence, S)){
         assert(0, "can't assign value in sequence set");
         static assert(false);
       }
-    }
+      }*/
   }
 
   TokenStream copy = tokenStream; //don't advance on failure
@@ -468,7 +512,7 @@ if(isInstanceOf!(Sequence, S)){
       alias piecePayloadTypes = typeof(piece).PayloadType.Types;
       pragma(msg, "piece: ", typeof(piece), " elem: ", elem, " types: ", piecePayloadTypes);
       //does piece actually hold some data?
-      static if(!is(piecePayloadTypes == void) && !is(piecePayloadTypes == TokenType!Lit, alias Lit)){
+      static if(!is(piecePayloadTypes == void)){// && !is(piecePayloadTypes == TokenType!Lit, alias Lit)){
         set!(argNumber!i)(piece.getPayload.contents);
       }
     }}
@@ -515,7 +559,12 @@ template ValueTypes(Ts...){
   import std.meta : staticMap, Filter;
 
   alias TsWithValues = Filter!(hasValue, Ts);
-  alias ValueTypes = staticMap!(ValueType, TsWithValues);
+
+  enum notNot(alias X) = !is(X == Not!Y,  Y);
+  alias ValuesWithoutNots = Filter!(notNot, Ts);
+  pragma(msg, "Value types for ", Ts, "wihtout nots: ", ValuesWithoutNots);
+  alias ValueTypes = staticMap!(ValueType, ValuesWithoutNots);//WithValues);
+  pragma(msg,  "ValueTypes alias: ", ValueTypes);
 }
 
 template ValueType(alias T){
@@ -529,10 +578,9 @@ template ValueType(alias T){
   } else static if(isInstanceOf!(Optional, T)){
     alias ChildType = ValueTypes!(TemplateArgsOf!T);
     alias ValueType = Nullable!ChildType;
-  } else static if(isInstanceOf!(Keep, T)){
-    //Not nullable.  Return/value types are different here (I think that makes sense)
-    alias ValueType = typeof(TemplateArgsOf!T); //TODO, handle general cases
-    pragma(msg, "ValueType for Keep: ", ValueType);
+  } else static if(!isType!T){
+    //type for literals
+    alias ValueType = TokenType!T;
   } else {
     mixin CTLog!("val type neither");
     alias ValueType = T;
