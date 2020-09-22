@@ -55,6 +55,7 @@ struct OneOf(Ts...){
   }
 
   alias WrappedTypes = staticMap!(Wrap, Ts);
+  //pragma(msg, "Wrapped types for ", Ts, ": ", WrappedTypes);
   
   struct NodeType{
     alias ST = SumType!WrappedTypes;

@@ -26,7 +26,7 @@ template tokenTypes(alias Module){
       alias wrap = T;
     }
   }
-  alias tokenTypes = staticMap!(wrap, tokensFromModule!Module);
+  alias tokenTypes = tokensFromModule!Module; //staticMap!(wrap, tokensFromModule!Module);
 }
 
 template TokenPayload(alias Module){

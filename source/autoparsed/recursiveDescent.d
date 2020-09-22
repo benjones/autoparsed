@@ -16,10 +16,13 @@ template TypesOnly(T...){
 }
 
 struct Payload(T...){
-  static if(T.length == 1)
+  static if(T.length == 1){
     alias Types = T[0];
-  else
+    enum singleType = true;
+  } else {
     alias Types = T;
+    enum singleType = false;
+  }
   static if(!is(Types == void))
     Types contents;
 }
@@ -114,21 +117,53 @@ if(hasUDA!(T, Lex) &&
   RTLog("parsing lexable token `", T.stringof, "` from stream: ", tokenStream);
 
   alias tArgs = TemplateArgsOf!uda;
-  static if(tArgs.length > 1){
+  //  static if(tArgs.length > 1){
     alias parseType = Sequence!(tArgs);
-  } else {
+    /*} else {
     alias parseType = tArgs;
-  }
+    }*/
   auto parsed = parse!(parseType)(tokenStream);
 
   alias PayloadType = Payload!T;
   alias RetType = ParseResult!(PayloadType, DefaultError);
   pragma(msg, "PT: ", PayloadType, " RT ", RetType);
   pragma(msg, "type of pasrsed: ", typeof(parsed));
-  
+
+  alias ParsedPayloadType = typeof(parsed).PayloadType;
+  pragma(msg, "Parsed PayloadTYpe types: ", ParsedPayloadType.Types);
+
+  static if(!ParsedPayloadType.singleType){
+    auto getIndices(){
+      size_t[] ret;
+      static foreach(i, PT; ParsedPayloadType.Types){{
+          static if(!is(PT == TokenType!X, alias X)){
+            ret ~= i;
+          }
+        }}
+      return ret;
+    }
+    import std.meta : aliasSeqOf;
+    alias valueIndices = aliasSeqOf!(getIndices());
+    pragma(msg, "value indices: ", valueIndices);
+    alias getValueType(size_t ind) = ParsedPayloadType.Types[ind];
+  }
   return parsed.data.match!(
     (typeof(parsed).PayloadType payload){
-      T toRet = construct!T(payload.contents);
+      static if(ParsedPayloadType.singleType){
+        static if(is(PT == TokenType!X, alias X)){
+          T toRet = construct!T();
+        } else {
+          T toRet = construct!T(parsed.getPayload.contents);
+        }
+        
+      } else {
+        alias ConstructorArgs = staticMap!(getValueType, valueIndices);
+        ConstructorArgs cArgs;
+        static foreach(cIndex, tIndex; valueIndices){
+          cArgs[cIndex] = parsed.getPayload.contents[tIndex];
+        }
+        T toRet = construct!T(cArgs);
+      }
       return RetType(PayloadType(toRet));
     },
     _ => RetType(DefaultError(to!string(_))));
@@ -340,9 +375,27 @@ if(isInstanceOf!(Optional, Opt)){
   //defer to the element parse, return whatever they do
   alias Args = TemplateArgsOf!Opt;
   static if(Args.length > 1){
-    return parse!(Sequence!Args)(tokenStream);
+    auto res = parse!(Sequence!Args)(tokenStream);
+    alias ResPayloadType = typeof(res).PayloadType;
+    alias PayloadType = Payload!(Nullable!(typeof(res).PayloadType.Types));
+    alias RetType = ParseResult!(PayloadType, DefaultError); //todo, no error
+
+    return res.data.match!(
+      (ResPayloadType pt) => RetType(PayloadType(nullable(res.getPayload))),
+      _ => RetType(PayloadType())); //successful, but just holds null
+                      
   } else {
-    return parse!(Args)(tokenStream);
+    auto res = parse!(Args)(tokenStream);
+    pragma(msg, "typeof res: ", typeof(res));
+    alias ResPayloadType = typeof(res).PayloadType;
+    alias PayloadType = Payload!(Nullable!(typeof(res).PayloadType.Types));
+    alias RetType = ParseResult!(PayloadType, DefaultError); //todo, no error
+    
+    return res.data.match!(
+      (ResPayloadType pt) => RetType(PayloadType(nullable(res.getPayload.contents))),
+      _ => RetType(PayloadType())); //successful, but just holds null
+    
+
   }
  }
 
@@ -355,8 +408,8 @@ if(isInstanceOf!(OneOf, OO)){
   RTLog("parsing `", OO.stringof, "` from stream: ", tokenStream);
 
   alias Ts = TemplateArgsOf!(OO.NodeType);
-  alias OONT = OneOf!(Ts).NodeType;
-  alias PayloadType = Payload!(OONT);
+  //  alias OONT = OneOf!(Ts).NodeType;
+  alias PayloadType = Payload!(OO.NodeType);
   alias RetType = ParseResult!(PayloadType, DefaultError);
   
   static foreach(T; Ts){{
@@ -365,7 +418,7 @@ if(isInstanceOf!(OneOf, OO)){
       auto res = parse!T(copy);
       pragma(msg, "typeof res: ", typeof(res));
       if(!res.isParseError){
-        auto oont = OONT(res.getPayload.contents);
+        auto oont = OO.NodeType(res.getPayload.contents);
         tokenStream = copy;
         return RetType(PayloadType(oont));
       }
@@ -457,6 +510,7 @@ if(isInstanceOf!(Sequence, S)){
   
 
   pragma(msg, S, ": values: ", Values);
+  
   //  static if(Values.length > 1){
     alias RetType = Values;
     //  } else {
@@ -473,7 +527,7 @@ if(isInstanceOf!(Sequence, S)){
   static size_t argNumber(size_t syntaxNumber)(){
     size_t v = 0;
     static foreach(i; 0..syntaxNumber){
-      static if(!is(Ts[i] == Not!X, X) ){ //hasValue!(Ts[i])){
+      static if(!is(Ts[i] == Not!X, alias X) ){ //hasValue!(Ts[i])){
         ++v;
       }
     }
@@ -504,6 +558,7 @@ if(isInstanceOf!(Sequence, S)){
   static foreach(i, elem; Ts){{
       pragma(msg, "OO elem: ", elem);
       auto piece = parse!elem(copy);
+      RTLog("parsed piece: ", piece, " element number ", i);
       if(piece.isParseError){
         static if(is(elem == Token)){ enum elemName = "Token"; }
         else enum elemName = elem.stringof;
@@ -512,7 +567,7 @@ if(isInstanceOf!(Sequence, S)){
       alias piecePayloadTypes = typeof(piece).PayloadType.Types;
       pragma(msg, "piece: ", typeof(piece), " elem: ", elem, " types: ", piecePayloadTypes);
       //does piece actually hold some data?
-      static if(!is(piecePayloadTypes == void)){// && !is(piecePayloadTypes == TokenType!Lit, alias Lit)){
+      static if(!is(elem  == Not!X, alias X)){// && !is(piecePayloadTypes == TokenType!Lit, alias Lit)){
         set!(argNumber!i)(piece.getPayload.contents);
       }
     }}
@@ -560,7 +615,7 @@ template ValueTypes(Ts...){
 
   alias TsWithValues = Filter!(hasValue, Ts);
 
-  enum notNot(alias X) = !is(X == Not!Y,  Y);
+  enum notNot(alias X) = !is(X == Not!Y,  alias Y);
   alias ValuesWithoutNots = Filter!(notNot, Ts);
   pragma(msg, "Value types for ", Ts, "wihtout nots: ", ValuesWithoutNots);
   alias ValueTypes = staticMap!(ValueType, ValuesWithoutNots);//WithValues);
@@ -571,14 +626,18 @@ template ValueType(alias T){
   pragma(msg, "val type for ", T);
   static if(isInstanceOf!(OneOf, T)){
     alias ValueType = T.NodeType;
-
+    pragma(msg, "got oneOf type: ", T, ", and its node type is ", T.NodeType.ST);
   } else static if(isInstanceOf!(RegexStar, T) || isInstanceOf!(RegexPlus, T)){
+    pragma(msg, "targs of regex star/plus: ", TemplateArgsOf!T);
     alias ChildType = ValueTypes!(TemplateArgsOf!T);
+    pragma(msg, "star/plus, child type: ", ChildType);
     alias ValueType = SliceOf!ChildType;
   } else static if(isInstanceOf!(Optional, T)){
+    pragma(msg, "it's an optional");
     alias ChildType = ValueTypes!(TemplateArgsOf!T);
     alias ValueType = Nullable!ChildType;
   } else static if(!isType!T){
+    pragma(msg, "its a literal");
     //type for literals
     alias ValueType = TokenType!T;
   } else {
@@ -701,7 +760,7 @@ template ConstructableWith(T, Args...){
 
 
 
-template CommonValueType(T) if(is(T : OneOf!Args.NodeType, Args)){
+template CommonValueType(T) if(is(T : OneOf!Args.NodeType, Args...)){
   import std.meta : allSatisfy;
 
   template isValueToken(T){
@@ -770,8 +829,8 @@ Target convert(Target, Src)(Src src){
 
 T construct(T, Args...)(Args args){
 
-  //  pragma(msg, "Constructable? :", T, " Args: ", Args, " ? ");
-  //  pragma(msg, ConstructableWith!(T, Args));
+  //pragma(msg, "Constructable? :", T, " Args: ", Args, " ? ");
+  // pragma(msg, ConstructableWith!(T, Args));
   static if(CArgs!T.length != Args.length){
     static assert(false, "Wrong number of args provided.  T is constructable with " ~ CArgs!T.stringof
                   ~ " but attempting to construct with " ~ Args.stringof); 

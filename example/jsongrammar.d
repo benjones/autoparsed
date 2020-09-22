@@ -19,7 +19,7 @@ import sumtype;
   enum rbracket = ']';
   enum comma = ',';
   
-  @Lex!(RegexPlus!(OneOf!(' ', '\t', '\r', '\n')))
+  @Lex!(RegexPlus!(OneOf!(' ', '\t')))//, '\r', '\n')))
     struct Whitespace {
       const(dchar)[] val;
     }
@@ -35,10 +35,14 @@ import sumtype;
   //I'm allowing leading 0s because who cares, todo: scientific notation
   @Lex!(Optional!('-'), RegexPlus!Digit) //, Optional!(Keep!('.'), RegexPlus!Digit))
     struct Number{
-      this(string rep){
-        RTLog("making Number from `", rep, "`");
+      import std.typecons : Nullable;
+      this(Nullable!(TokenType!('-')) minusSign, string rep){
+        RTLog("making Number from `", minusSign, " and ", rep, "`");
         import std.conv : to;
         val = to!double(rep);
+        if(!minusSign.isNull){
+          val *= -1;
+        }
       }
       double val;
     }
