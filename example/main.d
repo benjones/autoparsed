@@ -28,7 +28,7 @@ void main(string[] args){
                               ).array;
   writeln("lexed into tokens");
   writeln(tokens);
-  pragma(msg, "lexer setup fine, about to start parser");
+  pragma(msg, "lexer setup fine, about to start parser\n\n\n");
   auto parsed = parse!Sexp(tokens);
   writeln(parsed.getPayload.contents);
 }

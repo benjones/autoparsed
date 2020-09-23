@@ -29,8 +29,8 @@ struct TokenType(alias T){
 
 ///Rule to literal that we want to keep.  Useful in conjunction with Optional.
 ///By default, literals are checked, but don't don't return anything
-struct Keep(alias V){
-}
+//struct Keep(alias V){
+//}
 
 ///PEG rule for picking between options
 struct OneOf(Ts...){

@@ -48,7 +48,7 @@ struct Lexer(alias Mod){
     import autoparsed.recursivedescent;
     //should never be called when empty bc of rules of ranges
     auto pr = parse!parseRule(bytes_);
-    pragma(msg, "type of parse's return value in lexer popfront: ", typeof(pr));
+    pragma(msg, "type of parse's return value in lexer popfront: ", typeof(pr).PayloadType.Types.ST);
     if(pr.isParseError){
       import std.stdio;
       writeln("parse error in lexer: ", pr.getParseError.contents);

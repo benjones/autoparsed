@@ -60,7 +60,7 @@ unittest{
   auto lexer = Lexer!jsongrammar(testString);
 
   foreach(token;  lexer){
-    writeln(token);
+    writeln("\n\n", token, "\n\n");
   }
 
 }

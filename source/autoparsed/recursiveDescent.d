@@ -91,12 +91,12 @@ template partOfStream(T, StreamElement){
   import std.range;
   pragma(msg, "POS check: T: ", T, " StreamElem: ", StreamElement);
   static if(is(StreamElement.ST)){ pragma(msg, " .ST: ", StreamElement.ST);}
-  static if(is(StreamElement == OneOf!Args2.NodeType, Args2)){
+  static if(is(StreamElement == OneOf!Args2.NodeType, Args2...)){
     pragma(msg, "one of check passed");
     pragma(msg, "TA of ST.ST: ", TemplateArgsOf!(StreamElement.ST));
     pragma(msg, "contains check: ", contains!(T, TemplateArgsOf!(StreamElement.ST)));
   }
-  enum partOfStream = is(StreamElement == OneOf!Args.NodeType, Args) &&
+  enum partOfStream = is(StreamElement == OneOf!Args.NodeType, Args...) &&
     contains!(T, TemplateArgsOf!(StreamElement.ST));
   pragma(msg, "result: ", partOfStream);
     //enum partOfStream = contains!(T, TemplateArgsOf!TArgs);
@@ -117,11 +117,7 @@ if(hasUDA!(T, Lex) &&
   RTLog("parsing lexable token `", T.stringof, "` from stream: ", tokenStream);
 
   alias tArgs = TemplateArgsOf!uda;
-  //  static if(tArgs.length > 1){
-    alias parseType = Sequence!(tArgs);
-    /*} else {
-    alias parseType = tArgs;
-    }*/
+  alias parseType = Sequence!(tArgs);
   auto parsed = parse!(parseType)(tokenStream);
 
   alias PayloadType = Payload!T;
@@ -168,20 +164,6 @@ if(hasUDA!(T, Lex) &&
     },
     _ => RetType(DefaultError(to!string(_))));
   
-  /*
-  static if(isInstanceOf!(Nullable, typeof(parsed))){
-    if(parsed.isNull){
-      return Nullable!T();
-    } else {
-      return Nullable!T(construct!T(parsed.get));
-    }
-  } else {
-    if(parsed){
-      return Nullable!T(construct!T(parsed));
-    } else {
-      return Nullable!T();
-    }
-    }*/
 }
 
 ///return a T if it's at the front of the stream
@@ -215,13 +197,6 @@ if(isInstanceOf!(TokenType, T)){
 
   alias TArgs = TemplateArgsOf!T;
   return parse!TArgs(tokenStream);
-  /*
-  static if(isType!(TArgs)){
-    auto res = parse!(TemplateArgsOf!T)(tokenStream);
-    return res.isNull ? Nullable!T() : Nullable!T(T(res.get));
-  } else {
-    return parse!TArgs(tokenStream) ? Nullable!T(T()) : Nullable!T();
-    }*/
 
 }
 
@@ -263,16 +238,6 @@ if(annotatedConstructors!(T).length > 0) {
   }
 
   alias valueIndices = aliasSeqOf!(getIndices());
-  /*
-  template notTokenType(size_t i){
-    //pragma(msg, "i: ", i, "ptt[i]: ", ParsedPayloadType[i]);
-    enum notTokenType = !isInstanceOf!(TokenType, ParsedPayloadType[i]);//== TokenType!Y, alias Y);
-  }
-  pragma(msg, "ITT[0]?", notTokenType!0, " PTT length: ", ParsedPayloadType.length);
-  
-
-  alias valueIndices = Filter!(notTokenType,aliasSeqOf!(iota(ParsedPayloadType.length)));
-  */
   pragma(msg, "value indices: ", valueIndices);
   
   
@@ -317,13 +282,6 @@ if(isInstanceOf!(RegexStar, RS)){
   auto elem = parse!ElemType(copy);
 
   alias RetType = typeof(elem).PayloadType.Types; //? always 1 arg here?
-  /*
-  static if(isInstanceOf!(Nullable, typeof(elem))){
-    alias RetType = TemplateArgsOf!(typeof(elem))[0];
-  } else {
-    alias RetType = typeof(elem);
-    
-    }*/
   
   RetType[] ret;
   pragma(msg, "Regex star ret type: ", typeof(ret));
@@ -331,11 +289,6 @@ if(isInstanceOf!(RegexStar, RS)){
   
   while(!elem.isParseError){
     ret ~= elem.getPayload.contents;
-    /*static if(isInstanceOf!(Nullable, typeof(elem))){
-      ret ~= elem.get;
-    } else {
-      ret ~= elem;
-      }*/
     elem = parse!ElemType(copy);
   }
 
@@ -425,28 +378,7 @@ if(isInstanceOf!(OneOf, OO)){
       
   }}
   return RetType(DefaultError("None of " ~ Ts.stringof ~ " could be parsed"));
-  /*
-      static if(isInstanceOf!(Nullable, typeof(res))){
-        if(!res.isNull){
-          auto ret = nullable(OneOf!(Ts).NodeType(res.get));
-          tokenStream = copy;
-          RTLog("one of successfully parsed ` ", ret,
-                "` with type `", typeof(ret).stringof, "` with stream: ", tokenStream);
 
-          return ret;
-        }
-      } else {
-        if(res !is null){
-          tokenStream = copy;
-
-          RTLog("one of successfully parsed ` ", res,
-                "` with type `", typeof(res).stringof, "` with stream: ", tokenStream);
-          return nullable(OneOf!(Ts).NodeType(res));
-        }
-      }
-  }}
-  return Nullable!(OneOf!(Ts).NodeType)();
-  */
 }
 
 ///returns true if you cannot parse N from the stream right now
@@ -505,10 +437,6 @@ if(isInstanceOf!(Sequence, S)){
   alias TokensReplaced = ReplaceTokensRecursive!(TType, Ts);
   alias Values = ValueTypes!TokensReplaced;
 
-  //enum notTokenType(X) = !is(X : TokenType!Y, alias Y);
-  //alias Values = Filter!(notTokenType, ValuesWithLiterals);
-  
-
   pragma(msg, S, ": values: ", Values);
   
   //  static if(Values.length > 1){
@@ -527,7 +455,7 @@ if(isInstanceOf!(Sequence, S)){
   static size_t argNumber(size_t syntaxNumber)(){
     size_t v = 0;
     static foreach(i; 0..syntaxNumber){
-      static if(!is(Ts[i] == Not!X, alias X) ){ //hasValue!(Ts[i])){
+      static if(!isInstanceOf!(Not, Ts[i])){ //hasValue!(Ts[i])){
         ++v;
       }
     }
@@ -536,22 +464,7 @@ if(isInstanceOf!(Sequence, S)){
 
   void set(size_t i, T)(T val){
     pragma(msg, "setting ", i, " with ", T);
-    //    static if(isInstanceOf!(Tuple, RetType)){
-      ret[i] = val;
-      /*} else {
-      static assert(i == 0);
-      pragma(msg, "typeof ret: ", typeof(ret), " typeof val: ", typeof(val));
-      static if(is(typeof(ret) == typeof(val))){
-        ret = val;//nullish check already happened, so get should be fine
-      } else static if(isInstanceOf!(Nullable, typeof(val)) && is(typeof(val) == Nullable!(typeof(ret)))){
-        pragma(msg, "assigning value from a nullable");
-        ret = val.get();
-      } else {
-        pragma(msg, "targs typeof val: ", TemplateArgsOf!(typeof(val)), " typeof(ret) ", typeof(ret));
-        assert(0, "can't assign value in sequence set");
-        static assert(false);
-      }
-      }*/
+    ret[i] = val;
   }
 
   TokenStream copy = tokenStream; //don't advance on failure
@@ -567,41 +480,13 @@ if(isInstanceOf!(Sequence, S)){
       alias piecePayloadTypes = typeof(piece).PayloadType.Types;
       pragma(msg, "piece: ", typeof(piece), " elem: ", elem, " types: ", piecePayloadTypes);
       //does piece actually hold some data?
-      static if(!is(elem  == Not!X, alias X)){// && !is(piecePayloadTypes == TokenType!Lit, alias Lit)){
+      static if(!isInstanceOf!(Not, elem)){// && !is(piecePayloadTypes == TokenType!Lit, alias Lit)){
         set!(argNumber!i)(piece.getPayload.contents);
       }
     }}
     tokenStream = copy;
   return ResultType(PayloadType(ret));
-  /*
-    static if(isType!elem){
-      
-      static if(isInstanceOf!(Not, elem)){
-        if(!parse!elem(copy)){
-          return Nullable!RetType();
-        }
-      } else {
-        auto x = parse!(elem)(copy);
-        mixin CTLog!(S, ": i: ", i, " typeof x: ", typeof(x));
-        //an empty array from regexStar is OK
-        static if(!isInstanceOf!(RegexStar, elem) && !isInstanceOf!(Optional, elem)){
-          if(isNullish(x)){
-            return Nullable!RetType();
-          }
-        }
-        set!(argNumber!i)(x);
-      }
 
-    } else {
-      if(!check!elem(copy)){
-        return Nullable!RetType();
-      }
-    }
-    }}
-
-  tokenStream = copy;
-  return nullable(ret);
-  */
 }
 
 
@@ -615,7 +500,7 @@ template ValueTypes(Ts...){
 
   alias TsWithValues = Filter!(hasValue, Ts);
 
-  enum notNot(alias X) = !is(X == Not!Y,  alias Y);
+  enum notNot(alias X) = !isInstanceOf!(Not, X);
   alias ValuesWithoutNots = Filter!(notNot, Ts);
   pragma(msg, "Value types for ", Ts, "wihtout nots: ", ValuesWithoutNots);
   alias ValueTypes = staticMap!(ValueType, ValuesWithoutNots);//WithValues);
@@ -686,7 +571,7 @@ bool isNullish(T)(const auto ref T t){
 
 
 ///Parse a kept literal
-auto parse(KL, TokenStream)(ref TokenStream tokenStream)
+/*auto parse(KL, TokenStream)(ref TokenStream tokenStream)
 if(isInstanceOf!(Keep, KL)){
   mixin CTLog!("Parse Kept literal: `", KL, "`");
   RTLog("Parsing Kept literal: `", KL.stringof, "` from stream: ", tokenStream);
@@ -694,7 +579,7 @@ if(isInstanceOf!(Keep, KL)){
   alias Val = TemplateArgsOf!KL;
   alias ValType = typeof(Val);
   return isNullish(parse!Val(tokenStream)) ? Nullable!ValType() : Nullable!ValType(Val);
-}
+  }*/
 
 ///Is a literal at the front?
 auto parse(alias Lit, TokenStream)(ref TokenStream tokenStream){
