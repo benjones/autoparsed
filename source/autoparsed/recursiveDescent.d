@@ -257,29 +257,21 @@ if(isInstanceOf!(Optional, Opt)){
   RTLog("Parsing `", Opt.stringof, "` from stream: ", tokenStream);
   //defer to the element parse, return whatever they do
   alias Args = TemplateArgsOf!Opt;
-  static if(Args.length > 1){
+
+
+  static if(Args.length > 1)
     auto res = parse!(Sequence!Args)(tokenStream);
-    alias ResPayloadType = typeof(res).PayloadType;
-    alias PayloadType = Payload!(Nullable!(typeof(res).PayloadType.Types));
-    alias RetType = ParseResult!(PayloadType, DefaultError); //todo, no error
-
-    return res.data.match!(
-      (ResPayloadType pt) => RetType(PayloadType(nullable(res.getPayload))),
-      _ => RetType(PayloadType())); //successful, but just holds null
-                      
-  } else {
+  else
     auto res = parse!(Args)(tokenStream);
-    pragma(msg, "typeof res: ", typeof(res));
-    alias ResPayloadType = typeof(res).PayloadType;
-    alias PayloadType = Payload!(Nullable!(typeof(res).PayloadType.Types));
-    alias RetType = ParseResult!(PayloadType, DefaultError); //todo, no error
-    
-    return res.data.match!(
-      (ResPayloadType pt) => RetType(PayloadType(nullable(res.getPayload.contents))),
-      _ => RetType(PayloadType())); //successful, but just holds null
-    
 
-  }
+  alias ResPayloadType = typeof(res).PayloadType;
+  alias PayloadType = Payload!(Nullable!(typeof(res).PayloadType.Types));
+  alias RetType = ParseResult!(PayloadType, DefaultError); //todo, no error
+  
+  return res.data.match!(
+    (ResPayloadType pt) => RetType(PayloadType(nullable(res.getPayload.contents))),
+    _ => RetType(PayloadType())); //successful, but just holds null
+  
  }
 
 ///parse a choice between alternatives.  Return the first successful option
