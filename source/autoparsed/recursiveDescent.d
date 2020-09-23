@@ -82,18 +82,8 @@ template contains(T, Ts...) {
 }
 
 template partOfStream(T, StreamElement){
-  import std.range;
-  pragma(msg, "POS check: T: ", T, " StreamElem: ", StreamElement);
-  static if(is(StreamElement.ST)){ pragma(msg, " .ST: ", StreamElement.ST);}
-  static if(is(StreamElement == OneOf!Args2.NodeType, Args2...)){
-    pragma(msg, "one of check passed");
-    pragma(msg, "TA of ST.ST: ", TemplateArgsOf!(StreamElement.ST));
-    pragma(msg, "contains check: ", contains!(T, TemplateArgsOf!(StreamElement.ST)));
-  }
   enum partOfStream = is(StreamElement == OneOf!Args.NodeType, Args...) &&
     contains!(T, TemplateArgsOf!(StreamElement.ST));
-  pragma(msg, "result: ", partOfStream);
-    //enum partOfStream = contains!(T, TemplateArgsOf!TArgs);
 }
 
 ///return a T if it's at the front of the stream
@@ -181,7 +171,7 @@ if(annotatedConstructors!(T).length > 0 && !partOfStream!(T, typeof(tokenStream.
   return parsed.data.match!(
     (typeof(parsed).PayloadType payload){
       static if(ParsedPayloadType.singleType){
-        static if(isInstanceOf!(TokenType, ParsedPayloadType.Types)){// == TokenType!X, alias X)){
+        static if(isInstanceOf!(TokenType, ParsedPayloadType.Types)){
           T toRet = construct!T();
         } else {
           T toRet = construct!T(parsed.getPayload.contents);
@@ -198,20 +188,6 @@ if(annotatedConstructors!(T).length > 0 && !partOfStream!(T, typeof(tokenStream.
       return RetType(PayloadType(toRet));
     },
     _ => RetType(DefaultError(to!string(_))));
-
-
-  /*  
-  if(parsed.isParseError){
-    return RetType(parsed.getParseError);
-  } else {
-    alias ConstructorArgs = staticMap!(getValueType, valueIndices);
-    ConstructorArgs cArgs;
-    static foreach(cIndex, tIndex; valueIndices){
-      cArgs[cIndex] = parsed.getPayload.contents[tIndex];
-    }
-    return RetType(PayloadType(new T(cArgs)));
-    }*/
-
 }
 
 ///parse a * expression (0 or more repeats)
@@ -393,11 +369,7 @@ if(isInstanceOf!(Sequence, S)){
 
   pragma(msg, S, ": values: ", Values);
   
-  //  static if(Values.length > 1){
-    alias RetType = Values;
-    //  } else {
-    //    alias RetType = Values[0];
-    //  }
+  alias RetType = Values;
   pragma(msg, S, ": Ret type: ", RetType);
 
   RetType ret;
@@ -409,7 +381,7 @@ if(isInstanceOf!(Sequence, S)){
   static size_t argNumber(size_t syntaxNumber)(){
     size_t v = 0;
     static foreach(i; 0..syntaxNumber){
-      static if(!isInstanceOf!(Not, Ts[i])){ //hasValue!(Ts[i])){
+      static if(!isInstanceOf!(Not, Ts[i])){ 
         ++v;
       }
     }
@@ -434,7 +406,7 @@ if(isInstanceOf!(Sequence, S)){
       alias piecePayloadTypes = typeof(piece).PayloadType.Types;
       pragma(msg, "piece: ", typeof(piece), " elem: ", elem, " types: ", piecePayloadTypes);
       //does piece actually hold some data?
-      static if(!isInstanceOf!(Not, elem)){// && !is(piecePayloadTypes == TokenType!Lit, alias Lit)){
+      static if(!isInstanceOf!(Not, elem)){
         set!(argNumber!i)(piece.getPayload.contents);
       }
     }}
@@ -457,7 +429,7 @@ template ValueTypes(Ts...){
   enum notNot(alias X) = !isInstanceOf!(Not, X);
   alias ValuesWithoutNots = Filter!(notNot, Ts);
   pragma(msg, "Value types for ", Ts, "wihtout nots: ", ValuesWithoutNots);
-  alias ValueTypes = staticMap!(ValueType, ValuesWithoutNots);//WithValues);
+  alias ValueTypes = staticMap!(ValueType, ValuesWithoutNots);
   pragma(msg,  "ValueTypes alias: ", ValueTypes);
 }
 
