@@ -36,7 +36,7 @@ alias DefaultError = ParseError!string;
 
 
 struct ParseResult(P, PE)
-if(is(P : Payload!Args1, Args1) && is(PE : ParseError!Args2, Args2)){
+if(is(P : Payload!Args1, Args1...) && is(PE : ParseError!Args2, Args2)){
   SumType!(P, PE) data;
   alias data this;
   alias PayloadType = P;
@@ -68,16 +68,10 @@ unittest {
     alias PInt = Payload!int;
     alias PID = Payload!(int, double);
 
-    alias PEEmpty = ParseError!();
     alias PEString = ParseError!string;
-    alias PESS = ParseError!(string, string);
 
-    ParseResult!(PEmpty, PEEmpty) p1;
-    ParseResult!(PInt, PEEmpty) p2;
-    ParseResult!(PEmpty, PEString) p3;
-    ParseResult!(PInt, PEString) p4;
-
-    ParseResult!(PID, PESS) p5;
+    ParseResult!(PEmpty, PEString) p1;
+    ParseResult!(PInt, PEString) p2;
 }
 
 
