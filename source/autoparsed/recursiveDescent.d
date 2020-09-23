@@ -96,70 +96,6 @@ template partOfStream(T, StreamElement){
     //enum partOfStream = contains!(T, TemplateArgsOf!TArgs);
 }
 
-
-///parse a lexable token from a tokenStream
-///If the stream can return this token, this doesn't apply
-///This is used by the lexer
-auto parse(T, TokenStream)(ref TokenStream tokenStream)
-if(hasUDA!(T, Lex) &&
-   //   (!isInstanceOf!(SumType, typeof(tokenStream.front())) ||
-    !partOfStream!(T, typeof(tokenStream.front()))){
-
-  alias uda = getUDAs!(T, Lex);
-  mixin CTLog!("Parser for Lexable token `", T, "` with UDA `", uda, "`");
-
-  RTLog("parsing lexable token `", T.stringof, "` from stream: ", tokenStream);
-
-  alias tArgs = TemplateArgsOf!uda;
-  alias parseType = Sequence!(tArgs);
-  auto parsed = parse!(parseType)(tokenStream);
-
-  alias PayloadType = Payload!T;
-  alias RetType = ParseResult!(PayloadType, DefaultError);
-  pragma(msg, "PT: ", PayloadType, " RT ", RetType);
-  pragma(msg, "type of pasrsed: ", typeof(parsed));
-
-  alias ParsedPayloadType = typeof(parsed).PayloadType;
-  pragma(msg, "Parsed PayloadTYpe types: ", ParsedPayloadType.Types);
-
-  static if(!ParsedPayloadType.singleType){
-    auto getIndices(){
-      size_t[] ret;
-      static foreach(i, PT; ParsedPayloadType.Types){{
-          static if(!is(PT == TokenType!X, alias X)){
-            ret ~= i;
-          }
-        }}
-      return ret;
-    }
-    import std.meta : aliasSeqOf;
-    alias valueIndices = aliasSeqOf!(getIndices());
-    pragma(msg, "value indices: ", valueIndices);
-    alias getValueType(size_t ind) = ParsedPayloadType.Types[ind];
-  }
-  return parsed.data.match!(
-    (typeof(parsed).PayloadType payload){
-      static if(ParsedPayloadType.singleType){
-        static if(is(PT == TokenType!X, alias X)){
-          T toRet = construct!T();
-        } else {
-          T toRet = construct!T(parsed.getPayload.contents);
-        }
-        
-      } else {
-        alias ConstructorArgs = staticMap!(getValueType, valueIndices);
-        ConstructorArgs cArgs;
-        static foreach(cIndex, tIndex; valueIndices){
-          cArgs[cIndex] = parsed.getPayload.contents[tIndex];
-        }
-        T toRet = construct!T(cArgs);
-      }
-      return RetType(PayloadType(toRet));
-    },
-    _ => RetType(DefaultError(to!string(_))));
-  
-}
-
 ///return a T if it's at the front of the stream
 auto parse(T, TokenStream)(ref TokenStream tokenStream)
 if(hasUDA!(T, Token) &&
@@ -201,7 +137,7 @@ template SyntaxReturnType(T){
 
 ///parse an element that has a constructor annotated with the @Syntax UDA
 SyntaxReturnType!T parse(T, TokenStream)(ref TokenStream tokenStream)
-if(annotatedConstructors!(T).length > 0) {
+if(annotatedConstructors!(T).length > 0 && !partOfStream!(T, typeof(tokenStream.front()))) {
   import std.traits : getUDAs, isType, Parameters;
   import std.range: iota;
   import std.meta : Filter, staticMap, aliasSeqOf;
@@ -218,29 +154,53 @@ if(annotatedConstructors!(T).length > 0) {
   auto parsed =  parse!Seq(tokenStream);
   pragma(msg, "typeof parsed payload in @syntax parser: ", typeof(parsed));
 
-  alias ParsedPayloadType = typeof(parsed).PayloadType.Types;
-  pragma(msg, "Parsed PayloadTYpe: ", ParsedPayloadType);
+  alias ParsedPayloadType = typeof(parsed).PayloadType;
+  pragma(msg, "Parsed PayloadTYpe.types: ", ParsedPayloadType.Types);
 
-  auto getIndices(){
-    size_t[] ret;
-    static foreach(i, PT; ParsedPayloadType){{
-      static if(!is(PT == TokenType!X, alias X)){
-        ret ~= i;
-      }
-    }}
-    return ret;
+  static if(!ParsedPayloadType.singleType){
+    auto getIndices(){
+      size_t[] ret;
+      static foreach(i, PT; ParsedPayloadType.Types){{
+          static if(!is(PT == TokenType!X, alias X)){
+            ret ~= i;
+          }
+        }}
+      return ret;
+    }
+    
+    alias valueIndices = aliasSeqOf!(getIndices());
+    pragma(msg, "value indices: ", valueIndices);
+    
+    
+    alias getValueType(size_t ind) = ParsedPayloadType.Types[ind];
   }
-
-  alias valueIndices = aliasSeqOf!(getIndices());
-  pragma(msg, "value indices: ", valueIndices);
-  
-  
-  alias getValueType(size_t ind) = ParsedPayloadType[ind];
-
   
   alias PayloadType = Payload!T;
   alias RetType = ParseResult!(PayloadType, DefaultError);
-  
+
+  return parsed.data.match!(
+    (typeof(parsed).PayloadType payload){
+      static if(ParsedPayloadType.singleType){
+        static if(isInstanceOf!(TokenType, ParsedPayloadType.Types)){// == TokenType!X, alias X)){
+          T toRet = construct!T();
+        } else {
+          T toRet = construct!T(parsed.getPayload.contents);
+        }
+        
+      } else {
+        alias ConstructorArgs = staticMap!(getValueType, valueIndices);
+        ConstructorArgs cArgs;
+        static foreach(cIndex, tIndex; valueIndices){
+          cArgs[cIndex] = parsed.getPayload.contents[tIndex];
+        }
+        T toRet = construct!T(cArgs);
+      }
+      return RetType(PayloadType(toRet));
+    },
+    _ => RetType(DefaultError(to!string(_))));
+
+
+  /*  
   if(parsed.isParseError){
     return RetType(parsed.getParseError);
   } else {
@@ -250,7 +210,7 @@ if(annotatedConstructors!(T).length > 0) {
       cArgs[cIndex] = parsed.getPayload.contents[tIndex];
     }
     return RetType(PayloadType(new T(cArgs)));
-  }
+    }*/
 
 }
 
@@ -667,7 +627,11 @@ T construct(T, Args...)(Args args){
   }
 
   static if(ConstructableWith!(T, Args)){
-    return T(args);
+    static if(is(T == class)){
+      return new T(args);
+    } else { //hopefully a struct
+      return T(args);
+    }
   } else {
     CArgs!T cargs;
     static foreach(i, Arg; CArgs!T){

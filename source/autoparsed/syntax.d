@@ -7,9 +7,9 @@ struct Syntax(T...){
 
 ///UDA type for annotating the syntax for Tokens
 ///Similar to synatx, but "tokens" will be chars here
-struct Lex(T...){
+/*struct Lex(T...){
   alias Elements = T;
-}
+  }*/
 
 ///UDA type for annotating that a type or enum is a token
 enum Token;

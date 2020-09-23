@@ -18,15 +18,21 @@ import sumtype;
   enum lparen = '(';
   enum rparen = ')';
 
-  @Lex!(RegexPlus!(OneOf!(' ', '\t', '\r', '\n')))
-    struct Whitespace {
-      const(dchar)[] val;
+  struct Whitespace {
+    const(dchar)[] val;
+    @Syntax!(RegexPlus!(OneOf!(' ', '\t', '\r', '\n')))
+    this(const(dchar)[] val_){
+      val = val_;
     }
+  }
 
-  @Lex!(RegexPlus!(Not!(OneOf!(lparen, rparen)), Token))
-    struct Atom {
-      const(dchar)[] val;
+  struct Atom {
+    const(dchar)[] val;
+    @Syntax!(RegexPlus!(Not!(OneOf!(lparen, rparen)), Token))
+    this(const(dchar)[] val_){
+      val = val_;
     }
+  }
 }
 
 class Sexp {
