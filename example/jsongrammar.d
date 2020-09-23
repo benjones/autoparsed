@@ -54,13 +54,13 @@ import sumtype;
 
 unittest{
   import std.stdio;
+  import std.array;
   
   auto testString = `{} "as df" -10   101 -011    [{,]}`;
 
   auto lexer = Lexer!jsongrammar(testString);
 
-  foreach(token;  lexer){
-    writeln("\n\n", token, "\n\n");
-  }
+  auto tokens = lexer.array;
+  writeln(tokens);
 
 }

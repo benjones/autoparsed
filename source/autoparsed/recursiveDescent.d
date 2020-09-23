@@ -531,55 +531,6 @@ template ValueType(alias T){
   }
 }
 
-///return true if the next token ins the stream is an "S"
-bool check(alias S, TokenStream)(ref TokenStream tokenStream){
-  import std.range;
-
-  mixin CTLog!("Parser(check) for literal `", S, "`");
-  RTLog("parsing(checking) for `", S.stringof, "` from stream: ", tokenStream);
-  
-  if(tokenStream.empty) return false;
-  static if(isInstanceOf!(SumType, typeof(tokenStream.front()))){
-    return tokenStream.front.match!(
-      (TokenType!S t) {
-        tokenStream.popFront();
-        return true;
-      },
-      _ => false);
-  } else {
-    if(tokenStream.front == S){
-      tokenStream.popFront();
-      return true;
-    } else {
-      return false;
-    }
-  }
-}
-  
-bool isNullish(T)(const auto ref T t){
-  import std.traits : isPointer, isDynamicArray;
-  static if(isInstanceOf!(Nullable, T)){
-    return t.isNull();
-  }  else static if(isPointer!T){
-    return t is null;
-  } else static if(isDynamicArray!T){
-    return t.length == 0;
-  } else {
-    return !t;
-  }
-}
-
-
-///Parse a kept literal
-/*auto parse(KL, TokenStream)(ref TokenStream tokenStream)
-if(isInstanceOf!(Keep, KL)){
-  mixin CTLog!("Parse Kept literal: `", KL, "`");
-  RTLog("Parsing Kept literal: `", KL.stringof, "` from stream: ", tokenStream);
-  
-  alias Val = TemplateArgsOf!KL;
-  alias ValType = typeof(Val);
-  return isNullish(parse!Val(tokenStream)) ? Nullable!ValType() : Nullable!ValType(Val);
-  }*/
 
 ///Is a literal at the front?
 auto parse(alias Lit, TokenStream)(ref TokenStream tokenStream){
