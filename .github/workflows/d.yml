@@ -27,3 +27,4 @@ jobs:
         # In this mode, `mainSourceFile` is excluded and `version (unittest)` are included
         # See https://dub.pm/package-format-json.html#configurations
         dub test --compiler=$DC
+        dub test --compiler=$DC :example
