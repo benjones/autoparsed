@@ -38,26 +38,6 @@ template notModuleOrPackage(alias T){
   enum notModuleOrPackage = !(__traits(isModule, T) || __traits(isPackage, T));
 }
 
-template annotatedConstructors(alias T){
-  import std.meta : staticMap, Filter, AliasSeq;
-  import std.traits : getUDAs, fullyQualifiedName, isType, hasUDA, isInstanceOf;
-  enum isSyntax = isInstanceOf!(Sequence, T) ||
-    isInstanceOf!(OneOf, T) ||
-    isInstanceOf!(RegexPlus, T) ||
-    isInstanceOf!(RegexStar, T) ||
-    isInstanceOf!(Optional, T) ||
-    isInstanceOf!(Not, T);
-
-  static if(isSyntax){
-    alias annotatedConstructors = AliasSeq!();
-  } else {
-    alias getSymbol(alias S) = __traits(getMember, T, S);
-    enum hasSyntaxUDA(alias S) = hasUDA!(S, Syntax);
-    
-    alias members = staticMap!(getSymbol, __traits(allMembers, T));  
-    alias annotatedConstructors = Filter!(hasSyntaxUDA, members);
-  }
-}
 
 
 template SyntaxRulesFromModule(alias Module){

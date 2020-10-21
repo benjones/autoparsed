@@ -127,18 +127,16 @@ template SyntaxReturnType(T){
 
 ///parse an element that has a constructor annotated with the @Syntax UDA
 SyntaxReturnType!T parse(T, TokenStream)(ref TokenStream tokenStream)
-if(annotatedConstructors!(T).length > 0 && !partOfStream!(T, typeof(tokenStream.front()))) {
+if(hasUDA!(T, Syntax) && !partOfStream!(T, typeof(tokenStream.front()))) {
   import std.traits : getUDAs, isType, Parameters;
   import std.range: iota;
   import std.meta : Filter, staticMap, aliasSeqOf;
 
-  alias ac = annotatedConstructors!T;
-  alias syntax = getUDAs!(ac, Syntax)[0];
+  alias syntax = getUDAs!(T, Syntax)[0];
 
   mixin CTLog!("Parser for type `", T, "` with annotated constructor syntax`", syntax, "`");
   RTLog("parsing token `", T.stringof, "` with annotated constructor from stream: ", tokenStream);
 
-  alias Args = Parameters!(annotatedConstructors!(T)[0]);
   alias Seq = Sequence!(TemplateArgsOf!syntax);
   pragma(msg, "seq is: ", Seq);
   auto parsed =  parse!Seq(tokenStream);

@@ -18,26 +18,26 @@ import sumtype;
   enum lparen = '(';
   enum rparen = ')';
 
+  @Syntax!(RegexPlus!(OneOf!(' ', '\t', '\r', '\n')))
   struct Whitespace {
     const(dchar)[] val;
-    @Syntax!(RegexPlus!(OneOf!(' ', '\t', '\r', '\n')))
     this(const(dchar)[] val_){
       val = val_;
     }
   }
-
+  
+  @Syntax!(RegexPlus!(Not!(OneOf!(lparen, rparen)), Token))
   struct Atom {
     const(dchar)[] val;
-    @Syntax!(RegexPlus!(Not!(OneOf!(lparen, rparen)), Token))
     this(const(dchar)[] val_){
       val = val_;
     }
   }
 }
 
+@Syntax!(lparen, RegexPlus!(OneOf!(Atom, Sexp)), rparen)
 class Sexp {
 public:
-  @Syntax!(lparen, RegexPlus!(OneOf!(Atom, Sexp)), rparen)
   this(OneOf!(Atom, Sexp).NodeType[] members_){
     members = members_;
   }

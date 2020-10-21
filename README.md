@@ -6,4 +6,4 @@ Users define the grammar by writing classes for the various AST nodes and annota
 
 See the [example](example/) folder for an example that makes use of it.  
 
-You can run the example code with `dub run autoparsed:autoparsedExample` which will lex and parse S-expressions.  Check out [the sexp grammar](example/sexpGrammar.d) to see how to use the library.
+You can run the example code with `dub run :example` which will lex and parse S-expressions.  Check out [the sexp grammar](example/sexpGrammar.d) to see how to use the library.
