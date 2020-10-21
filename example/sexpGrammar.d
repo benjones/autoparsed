@@ -21,17 +21,17 @@ import sumtype;
   @Syntax!(RegexPlus!(OneOf!(' ', '\t', '\r', '\n')))
   struct Whitespace {
     const(dchar)[] val;
-    this(const(dchar)[] val_){
+    /*this(const(dchar)[] val_){
       val = val_;
-    }
+      }*/
   }
   
   @Syntax!(RegexPlus!(Not!(OneOf!(lparen, rparen)), Token))
   struct Atom {
     const(dchar)[] val;
-    this(const(dchar)[] val_){
+    /*    this(const(dchar)[] val_){
       val = val_;
-    }
+      }*/
   }
 }
 

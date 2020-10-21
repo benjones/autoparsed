@@ -11,9 +11,9 @@ void main(string[] args){
   
   import sexpGrammar;
   
-  pragma(msg, "\nsyntax rules for sepGrammar\n");
-  static foreach(sr; SyntaxRulesFromModule!sexpGrammar){
-    pragma(msg, "PEG string: " ~ RuleToPegString!sr);
+  pragma(msg, "\nsyntax rules for sepGrammar\n\n");
+  static foreach(i, sr; SyntaxRulesFromModule!sexpGrammar){
+    pragma(msg, "PEG string ", i, ": " ~ RuleToPegString!sr);
   }
   
   import autoparsed.lexer;

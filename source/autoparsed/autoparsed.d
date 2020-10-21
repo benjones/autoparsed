@@ -42,19 +42,19 @@ template notModuleOrPackage(alias T){
 
 template SyntaxRulesFromModule(alias Module){
   import std.meta: Filter, templateNot, staticMap;
-  import std.traits: isType, isAggregateType, fullyQualifiedName;
+  import std.traits: isType, isAggregateType, fullyQualifiedName, hasUDA;
 
   alias declarations = Filter!(isAggregateType,
                                Filter!(isType,
                                        Filter!(notModuleOrPackage, symbolsFromModule!Module)));
-  
-  alias SyntaxRulesFromModule = staticMap!(annotatedConstructors, declarations);
+  alias hasSyntaxUDA(X) = hasUDA!(X, Syntax);
+  alias SyntaxRulesFromModule  = Filter!(hasSyntaxUDA, declarations);
 }
 
-template RuleToPegString(alias Constructor){
-  import std.traits: getUDAs;
-  enum RuleToPegString = __traits(identifier, __traits(parent, Constructor)) ~ " <- " ~
-    FormatSyntax!(getUDAs!(Constructor, Syntax)[0]);
+template RuleToPegString(alias Type){
+  import std.traits: getUDAs, fullyQualifiedName;
+  enum RuleToPegString = fullyQualifiedName!Type ~ " <- " ~
+    FormatSyntax!(getUDAs!(Type, Syntax)[0]);
 }
 
 
