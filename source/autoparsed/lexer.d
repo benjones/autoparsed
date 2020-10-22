@@ -14,7 +14,7 @@ struct Lexer(alias Mod){
   import autoparsed.syntax;
   import autoparsed.autoparsed;
   import autoparsed.log;
-  
+
   import std.range.primitives;
 
   import std.traits : fullyQualifiedName;
