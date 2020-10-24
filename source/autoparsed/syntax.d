@@ -22,6 +22,7 @@ struct TokenType(alias T){
     alias type = T;
     T value;
   } else {
+    alias type = typeof(T);
     enum value = T;
   }
 }
