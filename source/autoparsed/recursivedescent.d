@@ -507,12 +507,6 @@ template CArgs(T){
   }
 }
 
-template ConstructableWith(T, Args...){
-  enum ConstructableWith = is(Tuple!(CArgs!T) == Tuple!Args);
-}
-
-
-
 template CommonValueType(T) if(is(T : OneOf!Args.NodeType, Args...)){
   import std.meta : allSatisfy;
 
@@ -585,20 +579,6 @@ Target convert(Target, Src)(Src src){
 }
 
 
-/*auto argRanges(T, Args...){
-
-  int[] ret;
-
-  alias cargs = CArgs!T;
-
-  
-  static foreach(i, carg; cargs){
-
-    
-  }
-  
-  
-  }*/
 
 //src is the constructor arg.  Target is the syntax element
 template Matches(Src, Target){
@@ -696,8 +676,6 @@ template ArgRanges(CA, TA, size_t Ci){
 T construct(T, Args...)(Args args){
 
   pragma(msg, "calling construct");
-  pragma(msg, "Constructable? :", T, " Args: ", Args, " ? ");
-  pragma(msg, ConstructableWith!(T, Args));
 
   alias Cargs = CArgs!T;
   
@@ -727,43 +705,7 @@ T construct(T, Args...)(Args args){
     return T(cargs);
   }
   
-  
-  
-  /*static if(CArgs!T.length != Args.length){
-    static assert(false, "Wrong number of args provided.  T is constructable with " ~ CArgs!T.stringof
-                  ~ " but attempting to construct with " ~ Args.stringof); 
-                  }*/
 
-  /*  CArgs!T cargs;
-    static foreach(i, Arg; CArgs!T){
-      static if(is(Arg == Args[i])){
-        cargs[i] = args[i];
-      } else {
-        cargs[i] = convert!(Arg)(args[i]);
-      }
-    }
-    return T(cargs);
-  */
-  
-
-  
-  /*static if(ConstructableWith!(T, Args)){
-    static if(is(T == class)){
-      return new T(args);
-    } else { //hopefully a struct
-      return T(args);
-    }
-  } else {
-    CArgs!T cargs;
-    static foreach(i, Arg; CArgs!T){
-      static if(is(Arg == Args[i])){
-        cargs[i] = args[i];
-      } else {
-        cargs[i] = convert!(Arg)(args[i]);
-      }
-    }
-    return T(cargs);
-    }*/
 }
 
 template ReplaceTokenRecursive(Replacement, alias T)
