@@ -7,6 +7,7 @@ import std.stdio;
 import std.conv : to;
 import std.typecons : nullable, Nullable, Tuple;
 import std.traits;
+import std.meta : AliasSeq;
 import std.range.primitives;
 import sumtype;
 
@@ -556,7 +557,9 @@ template CommonValueType(T) if(is(T : OneOf!Args.NodeType, Args...)){
 Target convert(Target, Src)(Src src){
   import std.conv : to;
   pragma(msg, "convert, src ", Src, " Target: ", Target);
-  static if(is(Src: OneOf!Args.NodeType, Args...)){
+  static if(is(Src : Target)){
+    return src;
+  } else static if(is(Src: OneOf!Args.NodeType, Args...)){
 
     //can a common type work for all the variants?
     pragma(msg, "Checking compatibility, OneOF NodeType: ", Src, " ST: ", Src.ST);
@@ -572,23 +575,179 @@ Target convert(Target, Src)(Src src){
     import std.array;
 
     return map!(convert!(ForeachType!Target, ForeachType!Src))(src).array;
+  } else static if(isInstanceOf!(Nullable, Src)){
+    return src.isNull() ? Target.init : convert!(Target)(src.get);
+  } else static if(isInstanceOf!(TokenType, Src)){
+    return convert!Target(src.value);
   } else {
     return to!(Target)(src);
   }
 }
 
 
+/*auto argRanges(T, Args...){
+
+  int[] ret;
+
+  alias cargs = CArgs!T;
+
+  
+  static foreach(i, carg; cargs){
+
+    
+  }
+  
+  
+  }*/
+
+//src is the constructor arg.  Target is the syntax element
+template Matches(Src, Target){
+  import std.meta : anySatisfy;
+  pragma(msg, "Match check: ", Src, " ", Target);
+  static if(is(Src == OneOf!OOArgs.NodeType, OOArgs...)){
+    pragma(msg, "src is OO, check all its possibilities");
+    enum MatchOne(alias X) = isType!X && .Matches!(X, Target);
+    enum Matches = anySatisfy!(MatchOne, OOArgs);
+  } else {
+    static if(is(Target == OneOf!OOArgs.NodeType, OOArgs...)){
+      pragma(msg, "Matches, target is a oneof with data: ", typeof(Target.data));
+
+      enum MatchOne(alias X) = isType!X && .Matches!(Src, X);
+      enum DirectMatch = anySatisfy!(MatchOne, OOArgs);
+
+      static if(DirectMatch){
+        enum Matches = true;
+      } else {
+        alias CVT = CommonValueType!Target;
+        enum Matches = is(CVT == void) ? false : is(CVT: Src);
+      }
+    } else static if(isInstanceOf!(Nullable, Target)){
+      pragma(msg, "found nullable");
+      enum Matches = .Matches!(Src, TemplateArgsOf!Target);
+    } else static if(isInstanceOf!(TokenType, Target)){
+      pragma(msg, "token type: ", Target.type);
+      enum Matches = is(Target.type : Src);
+    } else {
+      enum Matches = is(Target: Src);
+    }
+  }
+  pragma(msg, "matches: ? ", Matches);
+}
+
+private struct Wrap(T...){}
+
+
+template ArgRanges(CA, TA, size_t Ci){
+
+  pragma(msg, "AR: ", CA, " ", TA, " ", Ci);
+
+  alias Cargs = TemplateArgsOf!CA;
+  alias Targs = TemplateArgsOf!TA;
+
+  pragma(msg, "Cargs: ", Cargs);
+  pragma(msg, "Targs: ", Targs);
+  
+  static if(Cargs.length == 0){
+    static if(Targs.length == 0){
+      enum size_t[] ArgRanges = []; //all done
+    } else {
+      enum size_t[] ArgRanges = [-1]; //unmatched Synax params
+    }
+  } else {
+
+    static if(isArray!(Cargs[0])){
+      static if(Targs.length == 0){
+        enum size_t[] ArgRanges = []; //all done
+      } else static if(isArray!(Targs[0])){
+        static if(Matches!(ElementType!(Cargs[0]), ElementType!(Targs[0]))){
+          enum size_t[] ArgRanges = [Ci] ~ //Ti matches Ci, continue
+            .ArgRanges!(Wrap!(Cargs), Wrap!(Targs[1..$]), Ci + 1);
+        } else {
+          //Different element types, Try next syntax param
+          enum size_t[] ArgRanges = .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
+        }
+        
+      } else {
+        alias base = ElementType!(Cargs[0]);
+        static if(Matches!(base, Targs[0])){
+          //Ti can be part of the array at Ci
+          enum size_t[] ArgRanges = [Ci] ~ .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
+        } else {
+          //No more Tis match this array, move on
+          enum size_t[] ArgRanges = .ArgRanges!(Wrap!(Cargs[1..$]), TA, Ci +1);
+        }
+      }
+    } else {
+      static if(Matches!(Cargs[0], Targs[0])){
+        //Ti will be passed for Ci
+        enum size_t[] ArgRanges = [Ci] ~
+          .ArgRanges(Wrap!(Cargs[1..$]), !(Targs[1..$]), Ci + 1);
+      } else {
+        //no match
+        enum size_t[] ArgRanges = [-1];
+      }
+        
+    }
+}  
+  
+}
+
 
 T construct(T, Args...)(Args args){
 
-  //pragma(msg, "Constructable? :", T, " Args: ", Args, " ? ");
-  // pragma(msg, ConstructableWith!(T, Args));
-  static if(CArgs!T.length != Args.length){
+  pragma(msg, "calling construct");
+  pragma(msg, "Constructable? :", T, " Args: ", Args, " ? ");
+  pragma(msg, ConstructableWith!(T, Args));
+
+  alias Cargs = CArgs!T;
+  
+  pragma(msg, "AR inputs: ", Wrap!(Cargs), Wrap!(Args));
+  pragma(msg, ArgRanges!(Wrap!(Cargs), Wrap!(Args), 0));
+
+  enum AR = ArgRanges!(Wrap!(Cargs), Wrap!(Args), 0);
+
+  static assert(AR.length == Args.length, "Object constructable with " ~ Cargs.stringof ~
+                " cannot be created from Syntax with implied args " ~ Args.stringof);
+  
+  Cargs cargs;
+  pragma(msg, "Cargs: ", Cargs, " Targs: ", Args);
+  static foreach(i, cargIndex; AR){
+    pragma(msg, i, " ", cargIndex);
+    static if(isArray!(Cargs[cargIndex])){
+      pragma(msg, "carg is an array, so append to it");
+      cargs[cargIndex] ~= convert!(Cargs[cargIndex])(args[i]);
+    } else {
+      pragma(msg, "not an array, don't append");
+      cargs[cArgIndex] = convert!(Cargs[cargIndex])(args[i]);
+    }
+  }
+  static if(is(T == class)){
+    return new T(cargs);
+  } else {
+    return T(cargs);
+  }
+  
+  
+  
+  /*static if(CArgs!T.length != Args.length){
     static assert(false, "Wrong number of args provided.  T is constructable with " ~ CArgs!T.stringof
                   ~ " but attempting to construct with " ~ Args.stringof); 
-  }
+                  }*/
 
-  static if(ConstructableWith!(T, Args)){
+  /*  CArgs!T cargs;
+    static foreach(i, Arg; CArgs!T){
+      static if(is(Arg == Args[i])){
+        cargs[i] = args[i];
+      } else {
+        cargs[i] = convert!(Arg)(args[i]);
+      }
+    }
+    return T(cargs);
+  */
+  
+
+  
+  /*static if(ConstructableWith!(T, Args)){
     static if(is(T == class)){
       return new T(args);
     } else { //hopefully a struct
@@ -604,7 +763,7 @@ T construct(T, Args...)(Args args){
       }
     }
     return T(cargs);
-  }
+    }*/
 }
 
 template ReplaceTokenRecursive(Replacement, alias T)
