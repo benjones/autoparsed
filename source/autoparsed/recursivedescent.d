@@ -276,8 +276,6 @@ if(isInstanceOf!(Optional, Opt)){
 ///parse a choice between alternatives.  Return the first successful option
 auto parse(OO, TokenStream)(ref TokenStream tokenStream)
 if(isInstanceOf!(OneOf, OO)){
-  import std.typecons : nullable;
-
   mixin CTLog!("Parser for OneOf `", OO, "`");
   RTLog("parsing `", OO.stringof, "` from stream: ", tokenStream);
 
@@ -300,6 +298,39 @@ if(isInstanceOf!(OneOf, OO)){
   }}
   return RetType(DefaultError("None of " ~ Ts.stringof ~ " could be parsed"));
 
+}
+
+///Parse a token within an inclusive range of literal values
+///TODO: are things other than literals ever useful here?
+auto parse(IR, TokenStream)(ref TokenStream tokenStream)
+if(isInstanceOf!(InRange, IR)){
+
+  mixin CTLog!("Parser for InRange `", IR, "`");
+  RTLog("parsing `", IR.stringof, "` from stream: ", tokenStream);
+
+  enum first = TemplateArgsOf!IR[0];
+  enum last = TemplateArgsOf!IR[1];
+
+  static assert(!is(CommonType!(IR.LimitType, ElementType!TokenStream) == void));
+                
+  
+  alias PayloadType = Payload!(CommonType!(IR.LimitType, ElementType!TokenStream));
+  alias RetType = ParseResult!(PayloadType, DefaultError);
+
+  if(tokenStream.empty()){
+    RTLog("stream empty, returning false");
+    return RetType(DefaultError("empty stream"));
+  } else if(tokenStream.front >= first && tokenStream.front <= last){
+    RTLog("found value in range, returning it");
+    auto ret = RetType(PayloadType(tokenStream.front));
+    tokenStream.popFront;
+    RTLog("stream after parsing literal: ", tokenStream);
+    return ret;
+  } else {
+    RTLog("didn't find it, returning false");
+    return RetType(DefaultError("Looking for "~ IR.stringof ~ " but found "~ to!string(tokenStream.front)));
+  }
+  
 }
 
 ///returns true if you cannot parse N from the stream right now
@@ -381,7 +412,7 @@ if(isInstanceOf!(Sequence, S)){
 
   void set(size_t i, T)(T val){
     pragma(msg, "setting ", i, " with ", T);
-    ret[i] = val;
+    ret[i] = convert!(typeof(ret[i]))(val);
   }
 
   TokenStream copy = tokenStream; //don't advance on failure
@@ -429,6 +460,9 @@ template ValueType(alias T){
   static if(isInstanceOf!(OneOf, T)){
     alias ValueType = T.NodeType;
     pragma(msg, "got oneOf type: ", T, ", and its node type is ", T.NodeType.ST);
+  } else static if(isInstanceOf!(InRange, T)){
+    pragma(msg, "got InRange ", T);
+    alias ValueType = T.LimitType;
   } else static if(isInstanceOf!(RegexStar, T) || isInstanceOf!(RegexPlus, T)){
     pragma(msg, "targs of regex star/plus: ", TemplateArgsOf!T);
     alias ChildType = ValueTypes!(TemplateArgsOf!T);
@@ -446,6 +480,7 @@ template ValueType(alias T){
     mixin CTLog!("val type neither");
     alias ValueType = T;
   }
+  pragma(msg,  "val type for ", T, " is ", ValueType);
 }
 
 
@@ -550,8 +585,12 @@ template CommonValueType(T) if(is(T : OneOf!Args.NodeType, Args...)){
 
 Target convert(Target, Src)(Src src){
   import std.conv : to;
+  import std.traits : isNarrowString;
+  import std.utf : byCodeUnit;
+  
   pragma(msg, "convert, src ", Src, " Target: ", Target);
   static if(is(Src : Target)){
+    pragma(msg, "src implicitly converts to target, return it");
     return src;
   } else static if(is(Src: OneOf!Args.NodeType, Args...)){
 
@@ -567,10 +606,16 @@ Target convert(Target, Src)(Src src){
   } else static if(isArray!Target && isArray!Src){
     import std.algorithm: map;
     import std.array;
-
-    return map!(convert!(ForeachType!Target, ForeachType!Src))(src).array;
+    pragma(msg, "array conversion");
+    pragma(msg, "convert args: ", ForeachType!Target, " ", ForeachType!Src);
+    static if(isNarrowString!Src){
+      //fun with autodecoding!
+      return map!(convert!(ForeachType!Target, ForeachType!Src))(src.byCodeUnit).array;
+    } else {
+      return map!(convert!(ForeachType!Target, ForeachType!Src))(src).array;
+    }
   } else static if(isInstanceOf!(Nullable, Src)){
-    return src.isNull() ? Target.init : convert!(Target)(src.get);
+    return src.isNull() ? Target.init : convert!(Target)(src.get); 
   } else static if(isInstanceOf!(TokenType, Src)){
     return convert!Target(src.value);
   } else {
@@ -602,7 +647,8 @@ template Matches(Src, Target){
         enum Matches = is(CVT == void) ? false : is(CVT: Src);
       }
     } else static if(isInstanceOf!(Nullable, Target)){
-      pragma(msg, "found nullable");
+      //BUG!!! What about truly optional parameters?
+      pragma(msg, "found nullable");  
       enum Matches = .Matches!(Src, TemplateArgsOf!Target);
     } else static if(isInstanceOf!(TokenType, Target)){
       pragma(msg, "token type: ", Target.type);

@@ -87,6 +87,18 @@ struct Not(T...){
 
 }
 
+///PEG rule satisfied when token in inclusive range [First, Last]
+struct InRange(alias First, alias Last){
+  static assert( is(typeof(First) : typeof(Last)) || is(typeof(Last) : typeof(First)),
+                 "type of InRange limits must be compatible");
+  
+  static if(is(typeof(First) : typeof(Last)))
+    alias LimitType = typeof(Last);
+  else
+    alias LimitType = typeof(First);
+
+}
+
 // for internal use to handle sequences of tokens
 package struct Sequence(Ts...){
   alias Elements = Ts;
