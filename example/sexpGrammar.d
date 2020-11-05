@@ -26,7 +26,7 @@ import sumtype;
       }*/
   }
   
-  @Syntax!(RegexPlus!(Not!(OneOf!(lparen, rparen)), Token))
+  @Syntax!(RegexPlus!(Not!(OneOf!(lparen, rparen, Whitespace)), Token))
   struct Atom {
     const(dchar)[] val;
     /*    this(const(dchar)[] val_){

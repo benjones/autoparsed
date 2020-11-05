@@ -35,7 +35,7 @@ import sumtype;
     }
   }
 
-  private alias Digit = OneOf!('0', '1');//, '2', '3', '4', '5', '6', '7', '8', '9');
+  private alias Digit = InRange!('0', '9');//OneOf!('0', '1, '2', '3', '4', '5', '6', '7', '8', '9');
 
   //regex for a number -?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?
   //I'm allowing leading 0s because who cares, todo: scientific notation
@@ -67,7 +67,7 @@ unittest{
   import std.stdio;
   import std.array;
   
-  auto testString = `{} "as df" -10   101 -011    [{,]}`;
+  auto testString = `{} "as df" -10   121 -011 9999   [{,]}`;
 
   auto lexer = Lexer!jsongrammar(testString);
 
