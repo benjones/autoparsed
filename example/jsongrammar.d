@@ -21,6 +21,7 @@ import sumtype;
   enum rbracket = ']';
   enum colon = ':';
   enum comma = ',';
+  enum dot = '.';
   
   @Syntax!(RegexPlus!(OneOf!(' ', '\t')))//, '\r', '\n')))
   struct Whitespace {
@@ -43,7 +44,7 @@ import sumtype;
   //regex for a number -?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?
   //I'm allowing leading 0s because who cares, todo: scientific notation
 
-  @Syntax!(Optional!('-'), RegexPlus!Digit) //, Optional!(Keep!('.'), RegexPlus!Digit))
+  @Syntax!(Optional!('-'), RegexStar!Digit, Optional!dot, RegexStar!Digit)
   struct Number{
     import std.typecons : Nullable;
 
@@ -53,6 +54,7 @@ import sumtype;
       val = to!double(rep);
     }
     double val;
+    alias val this;
   }
 
 }
@@ -67,11 +69,17 @@ alias FieldSyntax = AliasSeq!(QuotedString, colon, JSONValueSyntax);
 @Syntax!(lcurly, RegexStar!(FieldSyntax, comma), Optional!(FieldSyntax), rcurly)
 struct JSONObject{
   private JSONValue[QuotedString] vals;
+  alias vals this;
   this(Tuple!(QuotedString, JSONValue)[] data){
     foreach(tup; data){
       vals[tup[0]]= tup[1];
     }
-  } //what types?
+  }
+
+  string toString(){
+    import std.conv: to;
+    return to!string(vals);
+  }
 }
 
 
@@ -81,6 +89,7 @@ unittest{
   import std.stdio;
   import std.array;
   import std.algorithm;
+  import std.conv : to;
   import autoparsed.recursivedescent;
 
   writeln("\n\nRUNNING\n\n");
@@ -96,5 +105,19 @@ unittest{
 
   auto jo = parse!JSONObject(tokens).getPayload.contents;
   writeln(jo);
+  jo[QuotedString("key")].data.match!(
+    (Number n){assert(n.val == 45); return 0;},
+    (_){assert(false); return 0;});
+
+  double[] numbers = [1, -10, 37.5, 36., -.98];
+  foreach(number; numbers){
+    auto str = to!string(number);
+    writeln("checking ", str);
+    auto lex = Lexer!jsongrammar(str);
+    Number parsed = parse!Number(lex).getPayload.contents;
+    writeln("parsed is: ", parsed);
+    assert(parsed.val == number);
+
+  }
   
 }
