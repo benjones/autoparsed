@@ -146,12 +146,9 @@ if(hasUDASafe!(T, Syntax) && !partOfStream!(T, typeof(tokenStream.front()))) {
   RTLog("parsing token `", T.stringof, "` with annotated constructor from stream: ", tokenStream);
 
   alias Seq = TemplateArgsOf!syntax;
-  pragma(msg, "seq is: ", Seq);
   auto parsed =  parse!Seq(tokenStream);
-  pragma(msg, "typeof parsed payload in @syntax parser: ", typeof(parsed));
 
   alias ParsedPayloadType = typeof(parsed).PayloadType;
-  pragma(msg, "Parsed PayloadTYpe.types: ", ParsedPayloadType.Types);
   
   alias PayloadType = Payload!T;
   alias RetType = ParseResult!(PayloadType, DefaultError);
@@ -186,8 +183,6 @@ if(isInstanceOf!(RegexStar, RS)){
   alias RetType = typeof(elem).PayloadType.Types; //? always 1 arg here?
   
   RetType[] ret;
-  pragma(msg, "Regex star ret type: ", typeof(ret));
-  pragma(msg, "typeof elem ", typeof(elem), " typeof payload contents: ", typeof(elem.getPayload.contents));
   
   while(!elem.isParseError){
     ret ~= elem.getPayload.contents;
@@ -213,9 +208,7 @@ if(isInstanceOf!(RegexPlus, RP)){
   alias StarType = RegexStar!(TemplateArgsOf!RP);
   auto ret = parse!(StarType)(tokenStream);
 
-  pragma(msg, "ret type: ", typeof(ret));
   alias PayloadType = typeof(ret).PayloadType;
-  pragma(msg, "payload type: ", PayloadType);
   alias RetType = ParseResult!(PayloadType, DefaultError);
   
   return ret.getPayload.contents.length > 0 ? RetType(ret.getPayload) :
@@ -254,9 +247,7 @@ if(isInstanceOf!(OneOf, OO)){
   
   static foreach(T; Ts){{
       TokenStream copy = tokenStream; //only advance the stream on success
-      pragma(msg, "OO: ", OO, " trying to parse ", T);
       auto res = parse!T(copy);
-      pragma(msg, "typeof res: ", typeof(res));
       if(!res.isParseError){
         auto oont = OO.NodeType(res.getPayload.contents);
         tokenStream = copy;
@@ -357,21 +348,14 @@ auto parse(TokenStream)(ref TokenStream tokenStream)
   
   //alias Ts = S.Elements;
   alias TType = ElementType!TokenStream;
-  pragma(msg, "TType: ", TType);
   alias TokensReplaced = ReplaceTokensRecursive!(TType, Ts);
-  pragma(msg, "Tokens replaced: ", TokensReplaced);
   alias Values = ValueTypes!(TokenStream, TokensReplaced);
 
-  pragma(msg, Ts, ": values: ", Values);
-
   alias RetType = Tuple!Values;
-  pragma(msg, Ts, ": Ret type: ", RetType);
 
   RetType ret;
   alias PayloadType = Payload!RetType;
   alias ResultType = ParseResult!(PayloadType, DefaultError);
-  pragma(msg, "Seq result type: ", ResultType);
-
   
   static size_t argNumber(size_t syntaxNumber)(){
     size_t v = 0;
@@ -384,16 +368,14 @@ auto parse(TokenStream)(ref TokenStream tokenStream)
   }
 
   void set(size_t i, T)(T val){
-    pragma(msg, "setting ", i, " of type " , typeof(ret[i]), " with ", T, " for Ts: ", Ts);
+    mixin CTLog!("setting ", i, " of type " , typeof(ret[i]), " with ", T, " for Ts: ", Ts);
     RTLog("setting arg number ", i, " from ", val);
     ret[i] = convert!(typeof(ret[i]))(val);
     RTLog("the converted value is ", ret[i]);
   }
 
   TokenStream copy = tokenStream; //don't advance on failure
-  pragma(msg, "stream type: ", TokenStream, " Ts: ", Ts);
   static foreach(i, elem; Ts){{
-      pragma(msg, i, " OO elem: ", elem);
       auto piece = .parse!elem(copy);
       RTLog("parsed piece: ", piece, " element number ", i);
       if(piece.isParseError){
@@ -402,7 +384,6 @@ auto parse(TokenStream)(ref TokenStream tokenStream)
         return ResultType(DefaultError("Couldn't parse " ~ elemName));
       }
       alias piecePayloadTypes = typeof(piece).PayloadType.Types;
-      pragma(msg, "piece: ", typeof(piece), " elem: ", elem, " types: ", piecePayloadTypes);
       //does piece actually hold some data?
       static if(!isInstanceOf!(Not, elem)){
         set!(argNumber!i)(piece.getPayload.contents);
@@ -426,65 +407,54 @@ template ValueTypes(TokenStream, Ts...){
 
   enum notNot(alias X) = !isInstanceOf!(Not, X);
   alias ValuesWithoutNots = Filter!(notNot, Ts);
-  pragma(msg, "Value types for ", Ts, "wihtout nots: ", ValuesWithoutNots);
   alias ValTypeWrapper(alias X) = ValueType!(TokenStream, X);
   alias ValueTypes = staticMap!(ValTypeWrapper, ValuesWithoutNots);
-  pragma(msg,  "ValueTypes alias: ", ValueTypes);
+  mixin CTLog!("ValueTypes of ", Ts, " are ", ValueTypes);
 }
 
 template ValueType(TokenStream, alias T){
-  pragma(msg, "val type for ", T);
   static if(isInstanceOf!(OneOf, T)){
     alias ValueType = T.NodeType;
-    pragma(msg, "got oneOf type: ", T, ", and its node type is ", T.NodeType.ST);
   } else static if(isInstanceOf!(InRange, T)){
-    pragma(msg, "got InRange ", T);
     alias ValueType = T.LimitType;
   } else static if(isInstanceOf!(RegexStar, T) || isInstanceOf!(RegexPlus, T)){
-    pragma(msg, "targs of regex star/plus: ", TemplateArgsOf!T);
     alias ChildType = ReturnType!(
-      (TokenStream ts) => parse!(TemplateArgsOf!T)(ts)
-                                  ).PayloadType.Types;
-    pragma(msg, "star/plus, child type: ", ChildType);
+      (TokenStream ts) => parse!(TemplateArgsOf!T)(ts) ).PayloadType.Types;
     alias ValueType = SliceOf!ChildType;
   } else static if(isInstanceOf!(Optional, T)){
-    pragma(msg, "it's an optional");
     alias ChildType = ReturnType!(
-      (TokenStream ts) => parse!(TemplateArgsOf!T)(ts)
-                                  ).PayloadType.Types;
+      (TokenStream ts) => parse!(TemplateArgsOf!T)(ts)).PayloadType.Types;
     alias ValueType = Nullable!ChildType;
   } else static if(!isType!T){
-    pragma(msg, "its a literal");
     //type for literals
     alias ValueType = TokenType!T;
   } else {
-    mixin CTLog!("val type neither");
     alias ValueType = T;
   }
-  pragma(msg,  "val type for ", T, " is ", ValueType);
+  mixin CTLog!("val type for ", T, " is ", ValueType);
 }
 
 
 ///Is a literal at the front?
 auto parse(alias Lit, TokenStream)(ref TokenStream tokenStream){
 
-  RTLog("parsing(non-check) for `", Lit.stringof, "` with type ", typeof(Lit).stringof," from stream: ", tokenStream);
-
   alias StreamElementType = ElementType!TokenStream;
   alias PayloadType = Payload!(TokenType!Lit);
   alias RetType = ParseResult!(PayloadType, DefaultError);
+
   mixin CTLog!("Parse(non-check) literal `", Lit, "`",
-               "payload type: `", PayloadType, "` RetType: `", RetType, "`");
-  pragma(msg, "steram type", TokenStream);
+    "payload type: `", PayloadType, "` RetType: `", RetType, "`");
+  RTLog("parsing(non-check) for `", Lit.stringof, "` with type ",
+    typeof(Lit).stringof," from stream: ", tokenStream);
+
+
   if(tokenStream.empty()){
     RTLog("stream empty, returning false");
     return RetType(DefaultError("empty stream"));
   } else {
     //stream is one of many possible token types
     static if(is(StreamElementType == OneOf!(Args).NodeType, Args...)){
-      pragma(msg, "stream elemtn type: ", StreamElementType.ST);
       auto fn = tokenStream.front;
-      pragma(msg, "front now: ", typeof(fn), typeof(fn.data));
 
       auto ret = tokenStream.front.data.match!(
         function RetType(TokenType!Lit tl){ return RetType(PayloadType(TokenType!Lit()));},
@@ -507,8 +477,6 @@ auto parse(alias Lit, TokenStream)(ref TokenStream tokenStream){
       }
     }
   }
-  
-
 }
 
 template CArgs(T){
@@ -518,18 +486,13 @@ template CArgs(T){
   } else static if(isTuple!T){
     alias CArgs = staticMap!(Unqual, T.Types);
   } else static if(hasMember!(T, "__ctor")){
-    //  pragma(msg, T, " has a contructor");
     alias CArgs = staticMap!(Unqual, Parameters!(__traits(getMember, T, "__ctor")));
-    
   } else {
-    //  pragma(msg, T, " doesn't have a constructor");
     alias CArgs = staticMap!(Unqual, Fields!T);
   }
 }
 
 enum MultiArgConstructor(T) = isAggregateType!T || isTuple!T;
-
-
 
 template CommonValueType(T) if(is(T : OneOf!Args.NodeType, Args...)){
   import std.meta : allSatisfy;
@@ -543,14 +506,13 @@ template CommonValueType(T) if(is(T : OneOf!Args.NodeType, Args...)){
   }
 
   enum allValueTokens = allSatisfy!(isValueToken, TemplateArgsOf!T);
-  //  pragma(msg, " are all value tokens? ", allValueTokens);
   static if(allValueTokens){
 
     alias getValue(T)= TemplateArgsOf!T[0];
     alias TokenValues = staticMap!(getValue, TemplateArgsOf!T);
     alias getType(alias V) = typeof(V);
     alias ValueTypes = staticMap!(getType, TokenValues);
-    //  pragma(msg, "Value Types", ValueTypes);
+
     alias CT = CommonType!(ValueTypes);
     static if(is(CT == void)){
       enum HasCommonType = false;
@@ -563,7 +525,6 @@ template CommonValueType(T) if(is(T : OneOf!Args.NodeType, Args...)){
     enum HasCommonType = false;
   }
 
-  //  pragma(msg, "has common type? ", HasCommonType);
   static if(!HasCommonType){
     alias CommonValueType = void;
   }
@@ -578,15 +539,13 @@ Target convert(Target, Src)(Src src){
   import std.utf : byCodeUnit;
   import std.typecons : isTuple;
   
-  pragma(msg, "convert, src ", Src, " Target: ", Target);
+  mixin CTLog!("convert, src ", Src, " Target: ", Target);
   RTLog("Converting ", src, " to type ", Target.stringof);
   static if(is(Src : Target)){
-    pragma(msg, "src implicitly converts to target, return it");
     return src;
   } else static if(is(Src: OneOf!Args.NodeType, Args...)){
 
     //can a common type work for all the variants?
-    pragma(msg, "Checking compatibility, OneOF NodeType: ", Src, " ST: ", Src.ST);
     alias CVT = CommonValueType!Src;
     static assert(!is(CVT == void), "Can't pass a " ~ Src.stringof ~
                   " as expected constructor argument type " ~ Target.stringof);
@@ -597,8 +556,6 @@ Target convert(Target, Src)(Src src){
   } else static if(isArray!Target && isArray!Src){
     import std.algorithm: map;
     import std.array;
-    pragma(msg, "array conversion");
-    pragma(msg, "convert args: ", ForeachType!Target, " ", ForeachType!Src);
     static if(isNarrowString!Src){
       //fun with autodecoding!
       return map!(convert!(ForeachType!Target, ForeachType!Src))(src.byCodeUnit).array;
@@ -606,22 +563,18 @@ Target convert(Target, Src)(Src src){
       return map!(convert!(ForeachType!Target, ForeachType!Src))(src).array;
     }
   } else static if(isInstanceOf!(Nullable, Src)){
-    pragma(msg, "nullable src");
     Target ret = [];
     if(!src.isNull()) ret = to!Target([convert!(ElementType!Target)(src.get)]);
     return ret;
   } else static if(isInstanceOf!(TokenType, Src)){
     return convert!Target(src.value);
   } else static if(isTuple!Src){
-    pragma(msg, "in convert, src is tuple");
+
     static if(Src.length == 1){
-      pragma(msg, "one arg tuple");
       return construct!Target(src.expand);
     } else if(isTuple!Target) {
-      pragma(msg, "target is tuple too");
       return construct!Target(src);
     } else {
-      pragma(msg, "expand the src");
       return construct!Target(src.expand);
     }
   } else {
@@ -635,13 +588,11 @@ Target convert(Target, Src)(Src src){
 template Matches(Src, Target){
   import std.meta : anySatisfy;
   import std.algorithm : canFind;
-  pragma(msg, "Match check: ", Src, " ", Target);
+  mixin CTLog!("Match check: ", Src, " ", Target);
   static if(is(Src == OneOf!OOArgs.NodeType, OOArgs...)){
-    pragma(msg, "src is OO, check all its possibilities");
     enum MatchOne(alias X) = isType!X && .Matches!(X, Target);
     enum Matches = anySatisfy!(MatchOne, OOArgs);
   } else static if(is(Target == OneOf!OOArgs.NodeType, OOArgs...)){
-    pragma(msg, "Matches, target is a oneof with data: ", typeof(Target.data));
     
     enum MatchOne(alias X) = isType!X && .Matches!(Src, X);
     enum DirectMatch = anySatisfy!(MatchOne, OOArgs);
@@ -654,36 +605,28 @@ template Matches(Src, Target){
     }
   } else static if(isInstanceOf!(Nullable, Target)){
     //BUG!!! What about truly optional parameters?
-    pragma(msg, "found nullable");  
     enum Matches = .Matches!(Src, SliceOf!(TemplateArgsOf!Target));
   } else static if(isInstanceOf!(TokenType, Target)){
-    pragma(msg, "token type: ", Target.type);
     enum Matches =  is(Target.type : Src);
   } else static if(isTuple!Target){
     static if(Target.length == 1 ){
       enum Matches = .Matches!(Src, Target.Types[0]);
     } else static if(isTuple!Src){
-      pragma(msg, "src and target are both tuples, `recurse`");
       enum AR = ArgRanges!(Wrap!(Src.Types), Wrap!(Target.Types), 0);
-      pragma(msg, "result of recursive AR is ", AR);
       enum Matches = AR.length == Target.Types.length && !AR.canFind(-1);
 
     } else {
       //can we call ArgRanges successfully?
-      pragma(msg, "try to 'recurse' on ArgRanges to resolve a tuple");
       enum AR = ArgRanges!(Wrap!(Src), Wrap!(Target.Types), 0);
-      pragma(msg, "result of recursive AR is ", AR);
       enum Matches = AR.length == Target.Types.length && !AR.canFind(-1);
     }
   } else static if(isArray!Src){
-    pragma(msg, "src is array, check if target is and that the element types match");
     enum Matches = isArray!Target && Matches!(ElementType!Src, ElementType!Target);
   } else {
-    pragma(msg, "matches fallthrough branch");
     enum Matches = is(Target: Src);
   }
   
-  pragma(msg, Src, "matches ", Target, "?: ",  Matches);
+  mixin CTLog!(Src, "matches ", Target, "?: ",  Matches);
 }
 
 private struct Wrap(T...){}
@@ -693,11 +636,6 @@ enum size_t SkipArg = -2; //this syntax element shouldn't get passed to a constr
 //probably a literal token
 
 template ArgRanges(CA, TA, size_t Ci){
-
-  pragma(msg, "\nAR: ", CA, " ", TA, " ", Ci);
-
-  alias Cargs = TemplateArgsOf!CA;
-  alias Targs = TemplateArgsOf!TA;
 
   /*
     Cargs empty? 
@@ -717,11 +655,12 @@ template ArgRanges(CA, TA, size_t Ci){
     Current Carg is a tuple?
     
    */
+
+  alias Cargs = TemplateArgsOf!CA;
+  alias Targs = TemplateArgsOf!TA;
+
+  mixin CTLog!("computing arg ranges with Cargs: ", Cargs, " and Targs ", Targs);
   
-
-  pragma(msg, "Cargs: ", Cargs);
-  pragma(msg, "Targs: ", Targs);
-
   static if(Cargs.length == 0){
     static if(Targs.length == 0){
       enum size_t[] ArgRanges = []; //all done
@@ -739,14 +678,12 @@ template ArgRanges(CA, TA, size_t Ci){
       //todo verify that at least 1 Targs is assigned to each Carg array element
       enum size_t[] ArgRanges = .ArgRanges!(Wrap!(Cargs[1..$]), TA, Ci +1);
     } else {
-      pragma(msg, "not enough Targs");
       enum size_t[] ArgRanges = [-1];
     }
     
   } else static if(isArray!(Cargs[0])){
 
     static if(isArray!(Targs[0])){
-      pragma(msg, "both are arrays");
       static if(Matches!(ElementType!(Cargs[0]), ElementType!(Targs[0]))){
         enum size_t[] ArgRanges = [Ci] ~ //Ti matches Ci, continue
           .ArgRanges!(Wrap!(Cargs), Wrap!(Targs[1..$]), Ci);
@@ -757,49 +694,38 @@ template ArgRanges(CA, TA, size_t Ci){
       
     } else {
       alias base = ElementType!(Cargs[0]);
-      pragma(msg, "Carg is array, see if Targ matches ", base);
       static if(isInstanceOf!(TokenType, Targs[0])){
         //Targ is unused, move on
-        pragma(msg, "element is a token type, so skip it");
         enum size_t[] ArgRanges = [SkipArg] ~ .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
       } else static if(isInstanceOf!(Nullable, Targs[0])){
         //Nullables match either nullables or array, try to match it to an array
-        pragma(msg, "element is a nullable, it might match this array");
         enum matches = Matches!(base, TemplateArgsOf!(Targs[0]));
         static if(matches){
           //cool
-          pragma(msg, "nullable matches this array, cool");
           enum size_t[] ArgRanges = [Ci] ~ .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
         } else {
           //move along
-          pragma(msg, "nullable doesn't match, move to next carg");
           enum size_t[] ArgRanges = .ArgRanges!(Wrap!(Cargs[1..$]), TA, Ci + 1);
         }
         
       } else static if(Matches!(base, Targs[0])){
         //Ti can be part of the array at Ci
-        pragma(msg, "element matches");
         enum size_t[] ArgRanges = [Ci] ~ .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
       } else static if(isTuple!(Targs[0])){
-        pragma(msg, "see if a tuple actually matches the array");
         enum tupleMatches = Matches!(Cargs[0], Targs[0]);
         static if(tupleMatches){
           //move along
-          pragma(msg, "yes, the tuple can match the array\n");
           enum size_t[] ArgRanges = [Ci] ~ .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
         } else {
-          pragma(msg, "the tuple doesn't match the array\n");
           enum size_t[] ArgRanges = .ArgRanges!(Wrap!(Cargs[1..$]), TA, Ci +1);
         }
       } else {
         //No more Tis match this array, move on
-        pragma(msg, "done trying to match this array");
         enum size_t[] ArgRanges = .ArgRanges!(Wrap!(Cargs[1..$]), TA, Ci +1);
       }
     }
     
   } else {
-    pragma(msg, "carg and targ are both scalars");
     static if(isInstanceOf!(TokenType, Targs[0])){
       //Targ is unused, move on
       enum size_t[] ArgRanges = [SkipArg] ~ .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
@@ -811,31 +737,28 @@ template ArgRanges(CA, TA, size_t Ci){
       //no match
       enum size_t[] ArgRanges = [-1];
     }
-    
   }
-  
 }
 
 
 T construct(T, Args...)(Args args){
 
-  pragma(msg, "\n\n\ncalling construct to make a ", T, " from ", Args);
+  mixin CTLog!("calling construct to make a ", T, " from ", Args);
   RTLog("calling construct to make a ", T.stringof, " from ", args);
   alias Cargs = CArgs!T;
 
-  pragma(msg, "AR inputs: ", Wrap!(Cargs), " ",  Wrap!(Args));
-
   enum bothTuples = isTuple!T && Args.length == 1 && isTuple!(Args[0]);
+
+  import std.algorithm : canFind;
   
   static if(bothTuples){
     enum AR = ArgRanges!(Wrap!(Cargs), Wrap!(Args[0].Types), 0);
-    enum OK = AR.length == Args[0].Types.length;
+    enum OK = AR.length == Args[0].Types.length && !AR.canFind(-1);
   } else {
     enum AR = ArgRanges!(Wrap!(Cargs), Wrap!(Args), 0);
-    enum OK = AR.length == Args.length;
+    enum OK = AR.length == Args.length && !AR.canFind(-1);
   }
-  pragma(msg, "AR inputs: ", Wrap!(Cargs), " ",  Wrap!(Args));
-  pragma(msg, "AR: ", AR);
+  mixin CTLog!("Arg ranges results for inputs from ", T, ", and ", Args, ": ", AR);
   
   static assert(OK, "Object constructable with " ~ Cargs.stringof ~
                 " cannot be created from Syntax with implied args " ~ Args.stringof);
@@ -858,32 +781,25 @@ T construct(T, Args...)(Args args){
   }
   
   static foreach(i, cargIndex; AR){
-    pragma(msg, "Cargs: ", Cargs, " Targs: ", Args);
-    pragma(msg, "i: ", i, " cargIndex: ", cargIndex);
     static if(cargIndex != SkipArg){
 
       static if(isArgArray!cargIndex){
-        pragma(msg, "carg is an array, so append to it");
         static if(Matches!(typeof(CArgAt!cargIndex), typeof(RealTArg[i]))){
           CArgAt!cargIndex ~= convert!(typeof(CArgAt!cargIndex))(RealTArg[i]);
         } else {
           CArgAt!cargIndex ~= convert!(ElementType!(typeof(CArgAt!cargIndex)))(RealTArg[i]);
         }
       } else {
-        pragma(msg, "not an array, don't append");
-        pragma(msg, "i: ", i, " args[0] type: ", typeof(RealTArg));
         static if(bothTuples){
-          pragma(msg, "both tuples");
           CArgAt!cargIndex = convert!(typeof(CArgAt!cargIndex))(args[0][i]);
         } else {
           CArgAt!cargIndex = convert!(typeof(CArgAt!cargIndex))(args[i]);
         }
-        pragma(msg, "converted successfully");
       }
     }
   }
-  pragma(msg, "Cargs of type: ", Cargs, " filled in, about to actually make a ", T,
-         "Cargs is T? ", is(Cargs : T));
+  mixin CTLog!("Cargs of type: ", Cargs, " filled in, about to actually make a ", T,
+               "Cargs is T? ", is(Cargs : T));
 
   static if(is(Cargs: T)){
     return cargs;
