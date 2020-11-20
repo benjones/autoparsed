@@ -46,14 +46,7 @@ import sumtype;
   @Syntax!(Optional!('-'), RegexPlus!Digit) //, Optional!(Keep!('.'), RegexPlus!Digit))
   struct Number{
     import std.typecons : Nullable;
-    /*this(Nullable!(TokenType!('-')) minusSign, string rep){
-      RTLog("making Number from `", minusSign, " and ", rep, "`");
-      import std.conv : to;
-      val = to!double(rep);
-      if(!minusSign.isNull){
-        val *= -1;
-      }
-      }*/
+
     this(string rep){
       import std.conv : to;
       RTLog("Making a number from: ", rep);
