@@ -58,9 +58,11 @@ struct Lexer(alias Mod){
       writeln("parse error in lexer: ", pr.getParseError.contents);
       front_.nullify();
     }
-    else
-
+    else{
       front_ = pr.getPayload.contents;
+      RTLog("lexer lexed: ", front_);
+    }
+
   }
   
 private:
