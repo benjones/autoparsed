@@ -99,10 +99,10 @@ struct InRange(alias First, alias Last){
 
 }
 
-// for internal use to handle sequences of tokens
-package struct Sequence(Ts...){
+/// represent a sequences of tokens
+/*struct Sequence(Ts...){
   alias Elements = Ts;
-}
+  }*/
 
 
 /*

@@ -10,6 +10,8 @@ import autoparsed.lexer;
 import autoparsed.syntax;
 import autoparsed.log;
 
+import std.typecons : Tuple;
+
 import sumtype;
 
 @Token {
@@ -17,6 +19,7 @@ import sumtype;
   enum rcurly = '}';
   enum lbracket = '[';
   enum rbracket = ']';
+  enum colon = ':';
   enum comma = ',';
   
   @Syntax!(RegexPlus!(OneOf!(' ', '\t')))//, '\r', '\n')))
@@ -53,6 +56,7 @@ import sumtype;
       }*/
     this(string rep){
       import std.conv : to;
+      RTLog("Making a number from: ", rep);
       val = to!double(rep);
     }
     double val;
@@ -61,17 +65,43 @@ import sumtype;
 }
 
 
+alias JSONValueSyntax = OneOf!(Number, JSONObject, /*JSONArray,*/ QuotedString);
+alias JSONValue = JSONValueSyntax.NodeType;
+
+import std.meta : AliasSeq;
+alias FieldSyntax = AliasSeq!(QuotedString, colon, JSONValueSyntax);
+
+@Syntax!(lcurly, RegexStar!(FieldSyntax, comma), Optional!(FieldSyntax), rcurly)
+struct JSONObject{
+  private JSONValue[QuotedString] vals;
+  this(Tuple!(QuotedString, JSONValue)[] data){
+    foreach(tup; data){
+      vals[tup[0]]= tup[1];
+    }
+  } //what types?
+}
+
+
 
 
 unittest{
   import std.stdio;
   import std.array;
-  
-  auto testString = `{} "as df" -10   121 -011 9999   [{,]}`;
+  import std.algorithm;
+  import autoparsed.recursivedescent;
 
+  writeln("\n\nRUNNING\n\n");
+  auto testString = `{"hello" : "world", "key" : 45}`;
+  writeln("lexing: ", testString);
   auto lexer = Lexer!jsongrammar(testString);
 
-  auto tokens = lexer.array;
-  writeln(tokens);
+  auto tokens = lexer.filter!( x => x.match!(
+                                 (Whitespace w) => false,
+                                 _ => true)
+                               ).array;
+  writeln("\n\nTOKENS:\n", tokens, "\n\n");
 
+  auto jo = parse!JSONObject(tokens).getPayload.contents;
+  writeln(jo);
+  
 }
