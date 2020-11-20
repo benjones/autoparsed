@@ -33,18 +33,6 @@ unittest {
   
 }
 
-/*struct Payload(T...){
-  static if(T.length == 1){
-    alias Types = T[0];
-    enum singleType = true;
-  } else {
-    alias Types = T;
-    enum singleType = false;
-  }
-  static if(!is(Types == void))
-    Types contents;
-    }*/
-
 struct Payload(T){
   alias Types = T;
   static if(!is(Types == void))
@@ -57,7 +45,6 @@ struct ParseError(T){
 }
 
 alias DefaultError = ParseError!string;
-
 
 struct ParseResult(P, PE)
 if(is(P : Payload!Args1, Args1...) && is(PE : ParseError!Args2, Args2)){
@@ -89,10 +76,10 @@ auto getParseError(PR: ParseResult!(P, PE), P, PE)(PR pr){
 
 unittest {
   alias PInt = Payload!int;
-  
+  alias PTuple = Payload!(Tuple!(int, string, double));
   alias PEString = ParseError!string;
-  
-  ParseResult!(PInt, PEString) p2;
+  ParseResult!(PInt, PEString) p1;
+  ParseResult!(PTuple, PEString) p2;
 }
 
 
@@ -165,59 +152,13 @@ if(hasUDASafe!(T, Syntax) && !partOfStream!(T, typeof(tokenStream.front()))) {
 
   alias ParsedPayloadType = typeof(parsed).PayloadType;
   pragma(msg, "Parsed PayloadTYpe.types: ", ParsedPayloadType.Types);
-
-  /*static if(isTuple!(ParsedPayloadType.Types)){
-    auto getIndices(){
-      size_t[] ret;
-      static foreach(i, PT; ParsedPayloadType.Types.Types){{ //get at the Types from the tuple
-          static if(!is(PT == TokenType!X, alias X)){
-            ret ~= i;
-          }
-        }}
-      return ret;
-    }
-    
-    alias valueIndices = aliasSeqOf!(getIndices());
-    pragma(msg, "value indices: ", valueIndices);
-    
-    
-    alias getValueType(size_t ind) = ParsedPayloadType.Types.Types[ind];
-    }*/
   
   alias PayloadType = Payload!T;
   alias RetType = ParseResult!(PayloadType, DefaultError);
-
   
   return parsed.data.match!(
-    (typeof(parsed).PayloadType payload){
-      static if(isTuple!(parsed.getPayload.Types)){
-        auto toRet = construct!T(parsed.getPayload.contents);//.expand);
-      } else {
-        auto toRet = construct!T(parsed.getPayload.contents);
-      }
-      return RetType(PayloadType(toRet));
-    },
-      /*
-      static if(!isTuple!(ParsedPayloadType.Types)){
-        static if(isInstanceOf!(TokenType, ParsedPayloadType.Types)){
-          T toRet = construct!T();
-        } else {
-          T toRet = construct!T(parsed.getPayload.contents);
-        }
-        
-      } else {
-        alias ConstructorArgs = staticMap!(getValueType, valueIndices);
-        ConstructorArgs cArgs;
-        pragma(msg, "about to construct a ", T, " from a payload tuple with valueIndices ", valueIndices);
-        pragma(msg, "parsed payload: ", typeof(parsed.getPayload.contents));
-        pragma(msg, "constructor args: ", ConstructorArgs);
-        static foreach(cIndex, tIndex; valueIndices){
-          pragma(msg, "cindex: ", cIndex, " tIndex ", tIndex);
-          cArgs[cIndex] = parsed.getPayload.contents[tIndex];
-        }
-        T toRet = construct!T(cArgs);
-      }
-      return RetType(PayloadType(toRet));*/
+    (typeof(parsed).PayloadType payload) =>
+      RetType(PayloadType(construct!T(parsed.getPayload.contents))),
     _ => RetType(DefaultError(to!string(_))));
 }
 
@@ -289,7 +230,6 @@ if(isInstanceOf!(Optional, Opt)){
   //defer to the element parse, return whatever they do
   alias Args = TemplateArgsOf!Opt;
 
-
   auto res = parse!(Args)(tokenStream);
 
   alias ResPayloadType = typeof(res).PayloadType;
@@ -309,7 +249,6 @@ if(isInstanceOf!(OneOf, OO)){
   RTLog("parsing `", OO.stringof, "` from stream: ", tokenStream);
 
   alias Ts = TemplateArgsOf!(OO.NodeType);
-  //  alias OONT = OneOf!(Ts).NodeType;
   alias PayloadType = Payload!(OO.NodeType);
   alias RetType = ParseResult!(PayloadType, DefaultError);
   
@@ -884,17 +823,6 @@ T construct(T, Args...)(Args args){
   RTLog("calling construct to make a ", T.stringof, " from ", args);
   alias Cargs = CArgs!T;
 
-  /*template ExpandTuples(T){
-    static if(isTuple!T){
-      alias ExpandTuples = T.Types;
-    } else {
-      alias ExpandTuples = T;
-    }
-  }
-
-  alias ExpandedArgs = staticMap!(ExpandTuples, Args);*/
-  
-
   pragma(msg, "AR inputs: ", Wrap!(Cargs), " ",  Wrap!(Args));
 
   enum bothTuples = isTuple!T && Args.length == 1 && isTuple!(Args[0]);
@@ -912,35 +840,6 @@ T construct(T, Args...)(Args args){
   static assert(OK, "Object constructable with " ~ Cargs.stringof ~
                 " cannot be created from Syntax with implied args " ~ Args.stringof);
 
-  /*size_t[] startIndices(){
-    size_t[] ret;
-    size_t i = 0;
-    static foreach(Arg; Args){
-      ret ~= i;
-      static if(isTuple!Arg){
-        i += Arg.length;
-      } else {
-        ++i;
-      }
-    }
-    return ret;
-  }
-
-  enum SA = startIndices();
-  pragma(msg, "SA: ", SA);
-  
-  auto get(size_t ind)(){
-    static foreach(i, sa; SA){
-      static if(isTuple!(Args[i])){
-        static if(ind >= sa && ind < sa + Args[i].length){
-          return args[i][ind - sa];
-        }
-      } else static if(sa == ind){
-        return args[i];
-      }
-    }
-    }*/
-  
   Cargs cargs;
   enum MAC = MultiArgConstructor!T;
   enum isArgArray(size_t ind) = (MAC && isArraySafe!(Cargs[ind])) ||
@@ -975,13 +874,6 @@ T construct(T, Args...)(Args args){
         pragma(msg, "i: ", i, " args[0] type: ", typeof(RealTArg));
         static if(bothTuples){
           pragma(msg, "both tuples");
-          pragma(msg, args[0].length);
-          static foreach(j; 0..args[0].length){
-            pragma(msg, typeof(args[0][j]));
-          }
-          pragma(msg, i);
-          pragma(msg, typeof(args[0][i]));
-          pragma(msg, typeof(CArgAt!cargIndex));
           CArgAt!cargIndex = convert!(typeof(CArgAt!cargIndex))(args[0][i]);
         } else {
           CArgAt!cargIndex = convert!(typeof(CArgAt!cargIndex))(args[i]);
@@ -990,7 +882,8 @@ T construct(T, Args...)(Args args){
       }
     }
   }
-  pragma(msg, "Cargs of type: ", Cargs, " filled in, about to actually make a ", T, "Cargs is T? ", is(Cargs : T));
+  pragma(msg, "Cargs of type: ", Cargs, " filled in, about to actually make a ", T,
+         "Cargs is T? ", is(Cargs : T));
 
   static if(is(Cargs: T)){
     return cargs;
