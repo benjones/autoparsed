@@ -60,7 +60,7 @@ import sumtype;
 }
 
 
-alias JSONValueSyntax = OneOf!(Number, JSONObject, /*JSONArray,*/ QuotedString);
+alias JSONValueSyntax = OneOf!(Number, JSONObject, JSONArray, QuotedString);
 alias JSONValue = JSONValueSyntax.NodeType;
 
 import std.meta : AliasSeq;
@@ -75,14 +75,23 @@ struct JSONObject{
       vals[tup[0]]= tup[1];
     }
   }
-
+  
   string toString(){
     import std.conv: to;
     return to!string(vals);
   }
 }
 
+@Syntax!(lbracket, RegexStar!(JSONValueSyntax, comma), Optional!(JSONValueSyntax), rbracket)
+struct JSONArray{
+  private JSONValue[] data;
+  alias data this;
 
+  this(JSONValue[] data_){
+    data = data_;
+  }
+  
+}
 
 
 unittest{
@@ -93,7 +102,7 @@ unittest{
   import autoparsed.recursivedescent;
 
   writeln("\n\nRUNNING\n\n");
-  auto testString = `{"hello" : "world", "key" : 45}`;
+  auto testString = `{"hello" : "world", "key" : 45, "anArray" :[1, "a string", {}]}`;
   writeln("lexing: ", testString);
   auto lexer = Lexer!jsongrammar(testString);
 
@@ -104,7 +113,7 @@ unittest{
   writeln("\n\nTOKENS:\n", tokens, "\n\n");
 
   auto jo = parse!JSONObject(tokens).getPayload.contents;
-  writeln(jo);
+  writeln("\n\n\n", jo, "\n\n\n");
   jo[QuotedString("key")].data.match!(
     (Number n){assert(n.val == 45); return 0;},
     (_){assert(false); return 0;});

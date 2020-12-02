@@ -5,10 +5,13 @@ import autoparsed.log;
 
 import std.stdio;
 import std.conv : to;
-import std.typecons : nullable, Nullable, Tuple, isTuple;
+import std.typecons;
 import std.traits;
-import std.meta : AliasSeq;
+import std.meta : AliasSeq, EraseAll;
+import std.algorithm;
+import std.array;
 import std.range.primitives;
+
 import sumtype;
 
 template TypesOnly(T...){
@@ -480,15 +483,16 @@ auto parse(alias Lit, TokenStream)(ref TokenStream tokenStream){
 }
 
 template CArgs(T){
+  pragma(msg, "getting CArgs of ", T);
   static assert(isType!T);
   static if(!isAggregateType!T){
-    alias CArgs = Unqual!T;
+    alias CArgs = Tuple!(Unqual!T);
   } else static if(isTuple!T){
-    alias CArgs = staticMap!(Unqual, T.Types);
+    alias CArgs = Tuple!(staticMap!(Unqual, T.Types));
   } else static if(hasMember!(T, "__ctor")){
-    alias CArgs = staticMap!(Unqual, Parameters!(__traits(getMember, T, "__ctor")));
+    alias CArgs = Tuple!(staticMap!(Unqual, Parameters!(__traits(getMember, T, "__ctor"))));
   } else {
-    alias CArgs = staticMap!(Unqual, Fields!T);
+    alias CArgs = Tuple!(staticMap!(Unqual, Fields!T));
   }
 }
 
@@ -556,6 +560,7 @@ Target convert(Target, Src)(Src src){
   } else static if(isArray!Target && isArray!Src){
     import std.algorithm: map;
     import std.array;
+    RTLog("doing array conversion... Converting ", src, " of type ", Src.stringof, " to ", Target.stringof);
     static if(isNarrowString!Src){
       //fun with autodecoding!
       return map!(convert!(ForeachType!Target, ForeachType!Src))(src.byCodeUnit).array;
@@ -563,20 +568,16 @@ Target convert(Target, Src)(Src src){
       return map!(convert!(ForeachType!Target, ForeachType!Src))(src).array;
     }
   } else static if(isInstanceOf!(Nullable, Src)){
+    RTLog("Type is nullable");
     Target ret = [];
+    pragma(msg, "convert dealing with a nullable, about to convert a ", typeof(src.get()), " to a ", ElementType!Target);
     if(!src.isNull()) ret = to!Target([convert!(ElementType!Target)(src.get)]);
+    RTLog("conversion result is: `", ret, "`");
     return ret;
   } else static if(isInstanceOf!(TokenType, Src)){
     return convert!Target(src.value);
   } else static if(isTuple!Src){
-
-    static if(Src.length == 1){
-      return construct!Target(src.expand);
-    } else if(isTuple!Target) {
-      return construct!Target(src);
-    } else {
-      return construct!Target(src.expand);
-    }
+    return construct!Target(src);
   } else {
     return to!(Target)(src);
   }
@@ -591,7 +592,9 @@ template Matches(Src, Target){
   mixin CTLog!("Match check: ", Src, " ", Target);
   static if(is(Src == OneOf!OOArgs.NodeType, OOArgs...)){
     enum MatchOne(alias X) = isType!X && .Matches!(X, Target);
+    pragma(msg, "any satisfy case");
     enum Matches = anySatisfy!(MatchOne, OOArgs);
+    pragma(msg, "any satisfy case for ", Src, " and ", Target, " is ", Matches);
   } else static if(is(Target == OneOf!OOArgs.NodeType, OOArgs...)){
     
     enum MatchOne(alias X) = isType!X && .Matches!(Src, X);
@@ -710,8 +713,10 @@ template ArgRanges(CA, TA, size_t Ci){
         
       } else static if(Matches!(base, Targs[0])){
         //Ti can be part of the array at Ci
+        pragma(msg, "checking array base type match for ", Cargs, " and ", Targs);
         enum size_t[] ArgRanges = [Ci] ~ .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
       } else static if(isTuple!(Targs[0])){
+        pragma(msg, "checking array tuple match for ", Cargs, " and ", Targs);
         enum tupleMatches = Matches!(Cargs[0], Targs[0]);
         static if(tupleMatches){
           //move along
@@ -740,76 +745,164 @@ template ArgRanges(CA, TA, size_t Ci){
   }
 }
 
+template directlyAssignable(T, Args...){
+  pragma(msg, "directly assignable? ", T, " from ", Args);
+  static if(Args.length != 1){
+    enum directlyAssignable = false;
+  } else static if( is(Args[0] : T)){
+    enum directlyAssignable = true;
+  } else static if(isTuple!(Args[0])){
+    import std.algorithm : canFind;
+    enum AR = ArgRanges!(Wrap!T, Wrap!(Args[0].Types), 0);
 
-T construct(T, Args...)(Args args){
-
-  mixin CTLog!("calling construct to make a ", T, " from ", Args);
-  RTLog("calling construct to make a ", T.stringof, " from ", args);
-  alias Cargs = CArgs!T;
-
-  enum bothTuples = isTuple!T && Args.length == 1 && isTuple!(Args[0]);
-
-  import std.algorithm : canFind;
-  
-  static if(bothTuples){
-    enum AR = ArgRanges!(Wrap!(Cargs), Wrap!(Args[0].Types), 0);
-    enum OK = AR.length == Args[0].Types.length && !AR.canFind(-1);
-  } else {
-    enum AR = ArgRanges!(Wrap!(Cargs), Wrap!(Args), 0);
-    enum OK = AR.length == Args.length && !AR.canFind(-1);
-  }
-  mixin CTLog!("Arg ranges results for inputs from ", T, ", and ", Args, ": ", AR);
-  
-  static assert(OK, "Object constructable with " ~ Cargs.stringof ~
-                " cannot be created from Syntax with implied args " ~ Args.stringof);
-
-  Cargs cargs;
-  enum MAC = MultiArgConstructor!T;
-  enum isArgArray(size_t ind) = (MAC && isArraySafe!(Cargs[ind])) ||
-    (!MAC && isArraySafe!(Cargs));
-
-  static if(MAC)
-    alias CArgAt(size_t ind) = cargs[ind];
-  else
-    alias CArgAt(size_t ind) = cargs;
-
-  
-  static if(bothTuples){
-    alias RealTArg = args[0];
-  } else {
-    alias RealTArg = args;
-  }
-  
-  static foreach(i, cargIndex; AR){
-    static if(cargIndex != SkipArg){
-
-      static if(isArgArray!cargIndex){
-        static if(Matches!(typeof(CArgAt!cargIndex), typeof(RealTArg[i]))){
-          CArgAt!cargIndex ~= convert!(typeof(CArgAt!cargIndex))(RealTArg[i]);
-        } else {
-          CArgAt!cargIndex ~= convert!(ElementType!(typeof(CArgAt!cargIndex)))(RealTArg[i]);
+    bool argsCheck()(){
+      static foreach(i, ar; AR){
+        static if(ar < Args[0].length){
+          pragma(msg, "arg check: ", i, " ", ar, " ", Args[0].Types[i], " ", is(Args[0].Types[i] : T));
         }
-      } else {
-        static if(bothTuples){
-          CArgAt!cargIndex = convert!(typeof(CArgAt!cargIndex))(args[0][i]);
-        } else {
-          CArgAt!cargIndex = convert!(typeof(CArgAt!cargIndex))(args[i]);
+        static if(ar == -1)
+          return false;
+        else static if(ar != SkipArg && !is(Args[0].Types[i] : T))
+          return false;
+      }
+      return true;
+    }
+    pragma(msg, "AR before argsCheck: ", AR);
+    enum directlyAssignable = argsCheck!()();
+    
+  } else {
+    enum directlyAssignable = false;
+  }
+}
+
+
+auto simplifyPayload(T)(T t){
+  pragma(msg, "Simpligying T: ", T);
+  static if(isTuple!T && !isInstanceOf!(Nullable, T)){
+    
+    alias SimplifiedType(X) = ReturnType!( () => simplifyPayload(X.init));
+    alias SimplifiedTypes = staticMap!(SimplifiedType, T.Types);
+    pragma(msg, "simplified types for ", T.Types, " are ", SimplifiedTypes);
+    
+    alias FilteredTypes = EraseAll!(void, SimplifiedTypes);
+    pragma(msg, "filtered types are ", FilteredTypes);
+    
+    FilteredTypes ret;
+    
+    static if(FilteredTypes.length == 0){
+      return; //void
+    } else {
+      
+      auto filteredIndexOf(size_t i)(){
+        size_t ret  = 0;
+        static foreach(ind; 0.. i){
+          static if(!is(SimplifiedTypes[ind] == void))
+            ret++;
+        }
+        return ret;
+      }
+      
+      static foreach(i; 0..T.Types.length){
+        static if(!is(SimplifiedTypes[i] == void)){
+          ret[filteredIndexOf!i] = simplifyPayload(t[i]);
         }
       }
+
+      static if(FilteredTypes.length == 1){
+        return ret[0];
+      } else {
+        return tuple(ret);
+      }
+    }
+    
+  } else static if(isArray!T){
+    return t.map!simplifyPayload.array;
+  } else static if(is(T: OneOf!Args.NodeType, Args...)){
+    //can a common type work for all the variants?
+    alias CVT = CommonValueType!T;
+    static if(is(CVT == void)){
+      return t;
+    } else {
+      return CVT(t.match!(x => x.value));
+    }
+
+  } else static if(isInstanceOf!(TokenType, T)){
+    return; //void
+  } else {
+    return t;
+  }
+}
+
+
+
+
+/* Construct calls that from JSON that make sense...
+
+
+tuple("calling construct to make a ", (Whitespace), " from ", (NodeType[]))
+tuple("calling construct to make a ", (QuotedString), " from ", (Tuple!(TokenType!('"'), Tuple!dchar[], TokenType!('"'))))
+IFFY: tuple("calling construct to make a ", (const(dchar)[]), " from ", (Tuple!(TokenType!('"'), Tuple!dchar[], TokenType!('"'))))
+IFFY: tuple("calling construct to make a ", (const(dchar)), " from ", (dchar))
+
+tuple("calling construct to make a ", (Number), " from ", (Tuple!(Nullable!(TokenType!('-')), dchar[], Nullable!(TokenType!('.')), dchar[])))
+iffy tuple("calling construct to make a ", (string), " from ", (Tuple!(Nullable!(TokenType!('-')), dchar[], Nullable!(TokenType!('.')), dchar[])))
+
+
+tuple("calling construct to make a ", (JSONArray), " from ", (Tuple!(TokenType!('['), Tuple!(NodeType, TokenType!(','))[], Nullable!(NodeType), TokenType!(']'))))
+tuple("calling construct to make a ", (NodeType[]), " from ", (Tuple!(TokenType!('['), Tuple!(NodeType, TokenType!(','))[], Nullable!(NodeType), TokenType!(']'))))
+IFFY tuple("calling construct to make a ", (NodeType[]), " from ", (TokenType!('[')), (Tuple!(NodeType, TokenType!(','))[]), (Nullable!(NodeType)), (TokenType!(']')))
+
+tuple("calling construct to make a ", (NodeType), " from ", (Tuple!(NodeType, TokenType!(','))))
+IFFY: tuple("calling construct to make a ", (NodeType), " from ", (NodeType), (TokenType!(',')))
+
+ */
+
+
+
+T construct(T, Args)(Args args){
+
+  pragma(msg, "\n\n");
+  mixin CTLog!("calling construct to make a ", T, " from ", Args);
+  RTLog("calling construct to make a ", T.stringof, " from ", args);
+
+  auto simplified = simplifyPayload(args);
+  alias Stype = typeof(simplified);
+
+  pragma(msg, "simplified type of ", Args, " is ", Stype);
+
+  static if(is(Stype : T)){
+    pragma(msg, "simplified version implicitly converts, cool");
+    return T(simplified);
+  } else {
+    pragma(msg,  "simplified version doesn't implicitly convert, need to do some work");
+
+    alias Cargs = CArgs!T;
+    pragma(msg, "Cargs: ", Cargs);
+
+    static if(!isTuple!Stype){
+      //one arg simplified type, better be a 1 arg constructor
+      static assert(Cargs.length == 1, "One arg simplified type");
+      return T(convert!(Cargs.Types[0])(simplified));
+    } else {
+    
+
+      enum AR = ArgRanges!(Cargs, Stype, 0);
+      pragma(msg, "Cargs: ", Cargs, " Stype: ", Stype, " AR: ", AR);
+      
+      Cargs cargs;
+      
+      static foreach(i, ar; AR){
+        pragma(msg, "i: ", i, " ar: ", ar);
+        static if(isArray!(Cargs[ar])){
+          cargs[ar] ~= convert!(Cargs.Types[ar])(simplified[i]);
+        } else {
+          cargs[ar] = convert!(Cargs.Types[ar])(simplified[i]);
+        }
+      }
+      
+      return T(cargs.expand);
     }
   }
-  mixin CTLog!("Cargs of type: ", Cargs, " filled in, about to actually make a ", T,
-               "Cargs is T? ", is(Cargs : T));
-
-  static if(is(Cargs: T)){
-    return cargs;
-  } else static if(is(T == class)){
-    return new T(cargs);
-  } else static if(isArray!T){
-    return cargs;
-  } else {
-    return T(cargs);
-  } 
 
 }
 
