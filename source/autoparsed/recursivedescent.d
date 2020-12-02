@@ -578,14 +578,6 @@ Target convert(Target, Src)(Src src){
     return convert!Target(src.value);
   } else static if(isTuple!Src){
     return construct!Target(src);
-    /*
-    static if(Src.length == 1){
-      return construct!Target(src.expand);
-    } else if(isTuple!Target) {
-      return construct!Target(src);
-    } else {
-      return construct!Target(src.expand);
-      }*/
   } else {
     return to!(Target)(src);
   }
@@ -912,95 +904,6 @@ T construct(T, Args)(Args args){
     }
   }
 
-  /*pragma(msg, "\n\n");
-  mixin CTLog!("calling construct to make a ", T, " from ", Args);
-  RTLog("calling construct to make a ", T.stringof, " from ", args);
-
-  enum DA = directlyAssignable!(T, Args);
-  pragma(msg, "is DA? ", DA);
-
-  static if(DA){
-    static if(is(Args[0] : T))
-      return T(args[0]);
-    else {
-      enum AR = ArgRanges!(Wrap!T, Wrap!(Args[0].Types), 0);
-      static foreach(i, ar; AR){
-        static if(ar < SkipArg){
-          return args[0][i];
-        }
-      }
-      assert(false);
-    }
-  } else {
-  
-    alias Cargs = CArgs!T;
-    pragma(msg, "Cargs: ", Cargs);
-    enum bothTuples = isTuple!T && Args.length == 1 && isTuple!(Args[0]);
-    pragma(msg, "both tuples? ", bothTuples);
-
-    import std.algorithm : canFind;
-  
-    static if(bothTuples){
-      enum AR = ArgRanges!(Wrap!(Cargs), Wrap!(Args[0].Types), 0);
-      enum OK = AR.length == Args[0].Types.length && !AR.canFind(-1);
-    } else {
-      enum AR = ArgRanges!(Wrap!(Cargs), Wrap!(Args), 0);
-      enum OK = AR.length == Args.length && !AR.canFind(-1);
-    }
-
-    mixin CTLog!("Arg ranges results for inputs from ", T, ", and ", Args, ": ", AR);
-  
-    static assert(OK, "Object constructable with " ~ Cargs.stringof ~
-                  " cannot be created from Syntax with implied args " ~ Args.stringof);
-
-    Cargs cargs;
-    enum MAC = MultiArgConstructor!T;
-    enum isArgArray(size_t ind) = (MAC && isArraySafe!(Cargs[ind])) ||
-      (!MAC && isArraySafe!(Cargs));
-
-    static if(MAC)
-      alias CArgAt(size_t ind) = cargs[ind];
-    else
-      alias CArgAt(size_t ind) = cargs;
-
-  
-    static if(bothTuples){
-      alias RealTArg = args[0];
-    } else {
-      alias RealTArg = args;
-    }
-  
-    static foreach(i, cargIndex; AR){
-      static if(cargIndex != SkipArg){
-
-        static if(isArgArray!cargIndex){
-          static if(Matches!(typeof(CArgAt!cargIndex), typeof(RealTArg[i]))){
-            CArgAt!cargIndex ~= convert!(typeof(CArgAt!cargIndex))(RealTArg[i]);
-          } else {
-            CArgAt!cargIndex ~= convert!(ElementType!(typeof(CArgAt!cargIndex)))(RealTArg[i]);
-          }
-        } else {
-          static if(bothTuples){
-            CArgAt!cargIndex = convert!(typeof(CArgAt!cargIndex))(args[0][i]);
-          } else {
-            CArgAt!cargIndex = convert!(typeof(CArgAt!cargIndex))(args[i]);
-          }
-        }
-      }
-    }
-    mixin CTLog!("Cargs of type: ", Cargs, " filled in, about to actually make a ", T,
-                 "Cargs is T? ", is(Cargs : T));
-
-    static if(is(Cargs: T)){
-      return cargs;
-    } else static if(is(T == class)){
-      return new T(cargs);
-    } else static if(isArray!T){
-      return cargs;
-    } else {
-      return T(cargs);
-    } 
-    }*/
 }
 
 template ReplaceTokenRecursive(Replacement, alias T)
