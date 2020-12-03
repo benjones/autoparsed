@@ -858,6 +858,13 @@ IFFY: tuple("calling construct to make a ", (NodeType), " from ", (NodeType), (T
  */
 
 
+auto make(T, Args...)(Args args){
+  static if(is(T == class)){
+    return new T(args);
+  } else {
+    return T(args);
+  }
+}
 
 T construct(T, Args)(Args args){
 
@@ -870,9 +877,10 @@ T construct(T, Args)(Args args){
 
   pragma(msg, "simplified type of ", Args, " is ", Stype);
 
+  
   static if(is(Stype : T)){
     pragma(msg, "simplified version implicitly converts, cool");
-    return T(simplified);
+    return make!T(simplified);
   } else {
     pragma(msg,  "simplified version doesn't implicitly convert, need to do some work");
 
@@ -882,7 +890,7 @@ T construct(T, Args)(Args args){
     static if(!isTuple!Stype){
       //one arg simplified type, better be a 1 arg constructor
       static assert(Cargs.length == 1, "One arg simplified type");
-      return T(convert!(Cargs.Types[0])(simplified));
+      return make!T(convert!(Cargs.Types[0])(simplified));
     } else {
     
 
@@ -900,7 +908,7 @@ T construct(T, Args)(Args args){
         }
       }
       
-      return T(cargs.expand);
+      return make!T(cargs.expand);
     }
   }
 
