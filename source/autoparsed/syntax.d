@@ -33,7 +33,7 @@ struct TokenType(alias T){
 struct OneOf(Ts...){
   import std.traits: fullyQualifiedName, TemplateOf, TemplateArgsOf, isInstanceOf, isType, CommonType;
   import std.meta : staticMap, allSatisfy;
-  
+
   static if(Ts.length < 2){
     pragma(msg, "Warning: using OneOf to pick between "
            ~ Ts.length~ " options.  You should probably provide at least 2 options.");
@@ -53,7 +53,7 @@ struct OneOf(Ts...){
 
   alias WrappedTypes = staticMap!(Wrap, Ts);
   //pragma(msg, "Wrapped types for ", Ts, ": ", WrappedTypes);
-  
+
   struct NodeType{
     alias ST = SumType!WrappedTypes;
     ST data;
@@ -64,7 +64,7 @@ struct OneOf(Ts...){
       }
     }
   }
-  
+
 }
 
 ///PEG rule for "at least one"
@@ -79,7 +79,7 @@ struct RegexStar(T...){
 
 ///PEG rule for 0 or 1 of this
 struct Optional(T...){
-  
+
 }
 
 ///PEG rule that is satisfied if the next token is Not any of the Ts
@@ -91,7 +91,7 @@ struct Not(T...){
 struct InRange(alias First, alias Last){
   static assert( is(typeof(First) : typeof(Last)) || is(typeof(Last) : typeof(First)),
                  "type of InRange limits must be compatible");
-  
+
   static if(is(typeof(First) : typeof(Last)))
     alias LimitType = typeof(Last);
   else

@@ -22,7 +22,7 @@ import sumtype;
   enum colon = ':';
   enum comma = ',';
   enum dot = '.';
-  
+
   @Syntax!(RegexPlus!(OneOf!(' ', '\t')))//, '\r', '\n')))
   struct Whitespace {
     const(dchar)[] val;
@@ -30,7 +30,7 @@ import sumtype;
       val = val_;
     }
   }
-  
+
   @Syntax!('"', RegexStar!(Not!('"'), Token), '"')
   struct QuotedString {
     const(dchar)[] val;
@@ -75,7 +75,7 @@ struct JSONObject{
       vals[tup[0]]= tup[1];
     }
   }
-  
+
   string toString(){
     import std.conv: to;
     return to!string(vals);
@@ -90,7 +90,7 @@ struct JSONArray{
   this(JSONValue[] data_){
     data = data_;
   }
-  
+
 }
 
 
@@ -132,5 +132,5 @@ unittest{
     assert(parsed.val == number);
 
   }
-  
+
 }

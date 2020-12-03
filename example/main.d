@@ -8,14 +8,14 @@ void main(string[] args){
   import std.array;
   import std.algorithm;
   import sumtype;
-  
+
   import sexpGrammar;
-  
+
   pragma(msg, "\nsyntax rules for sepGrammar\n\n");
   static foreach(i, sr; SyntaxRulesFromModule!sexpGrammar){
     pragma(msg, "PEG string ", i, ": " ~ RuleToPegString!sr);
   }
-  
+
   import autoparsed.lexer;
   writeln("starting lexer");
   auto lexer = Lexer!sexpGrammar("( \t hello (  goodbye)\n)");
@@ -32,4 +32,3 @@ void main(string[] args){
   auto parsed = parse!Sexp(tokens);
   writeln(parsed.getPayload.contents);
 }
-
