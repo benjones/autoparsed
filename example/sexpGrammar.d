@@ -25,7 +25,7 @@ import sumtype;
       val = val_;
       }*/
   }
-  
+
   @Syntax!(RegexPlus!(Not!(OneOf!(lparen, rparen, Whitespace)), Token))
   struct Atom {
     const(dchar)[] val;
@@ -50,4 +50,3 @@ public:
 private:
   OneOf!(Atom, Sexp).NodeType[] members;
 }
-

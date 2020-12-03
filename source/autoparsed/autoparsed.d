@@ -18,7 +18,7 @@ template tokensFromModule(alias Module){
 template tokenTypes(alias Module){
   import std.meta : staticMap;
   import std.traits : isType;
-  
+
   template wrap(alias T){
     static if(!isType!T){
       alias wrap = TokenType!T;
@@ -79,7 +79,7 @@ template FormatExpression(alias S) {
 
     alias tArgs = TemplateArgsOf!S;
     alias recurse(alias T) = FormatExpression!T;
-    
+
     enum fp = [staticMap!(recurse, tArgs)];
     enum joinedParts = join(fp, ", ");
     enum FormatExpression = __traits(identifier, S) ~ "(" ~ joinedParts ~ ")";

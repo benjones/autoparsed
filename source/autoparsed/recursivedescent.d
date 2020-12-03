@@ -33,7 +33,7 @@ unittest {
   static assert(hasUDASafe!(S1, UDA));
   static assert(!hasUDASafe!(S2, UDA));
   static assert(!hasUDASafe!(dchar, UDA));
-  
+
 }
 
 struct Payload(T){
@@ -101,13 +101,13 @@ template partOfStream(T, StreamElement){
 auto parse(T, TokenStream)(ref TokenStream tokenStream)
 if(hasUDASafe!(T, Token) &&
    partOfStream!(T, ElementType!TokenStream)){
-  
+
   mixin CTLog!("Parser for already lexed Token `", T, "` from stream of type `", TokenStream, "`");
   RTLog("parsing token `", T.stringof, "` from stream: ", tokenStream);
 
   alias PayloadType = Payload!T;
   alias ResultType = ParseResult!(PayloadType, DefaultError);
-  
+
   if(tokenStream.empty) return ResultType(DefaultError("empty stream"));
   return tokenStream.front.match!(
     (T t){
@@ -117,7 +117,7 @@ if(hasUDASafe!(T, Token) &&
     },
     _ => ResultType(DefaultError( "looking for "~ T.stringof~ " but found "~ to!string(tokenStream.front)))
   );
-  
+
 }
 
 ///Parse a token, forwards either to another overload, or the literal checker
@@ -152,10 +152,10 @@ if(hasUDASafe!(T, Syntax) && !partOfStream!(T, typeof(tokenStream.front()))) {
   auto parsed =  parse!Seq(tokenStream);
 
   alias ParsedPayloadType = typeof(parsed).PayloadType;
-  
+
   alias PayloadType = Payload!T;
   alias RetType = ParseResult!(PayloadType, DefaultError);
-  
+
   return parsed.data.match!(
     (typeof(parsed).PayloadType payload) =>
       RetType(PayloadType(construct!T(parsed.getPayload.contents))),
@@ -176,17 +176,17 @@ if(isInstanceOf!(RegexStar, RS)){
     alias ElemType = Elems[0];
     static assert(!isInstanceOf!(Optional, ElemType), "RegexStar of an Optional doesn't make sense");
   }
-  
+
   mixin CTLog!("Elem type: `", ElemType, "`");
 
-  
+
   TokenStream copy = tokenStream;
   auto elem = parse!ElemType(copy);
 
   alias RetType = typeof(elem).PayloadType.Types; //? always 1 arg here?
-  
+
   RetType[] ret;
-  
+
   while(!elem.isParseError){
     ret ~= elem.getPayload.contents;
     elem = parse!ElemType(copy);
@@ -207,13 +207,13 @@ if(isInstanceOf!(RegexPlus, RP)){
 
   mixin CTLog!("Parser for RegexPlus `", RP, "`");
   RTLog("parsing `", RP.stringof, "` from stream: ", tokenStream);
-  
+
   alias StarType = RegexStar!(TemplateArgsOf!RP);
   auto ret = parse!(StarType)(tokenStream);
 
   alias PayloadType = typeof(ret).PayloadType;
   alias RetType = ParseResult!(PayloadType, DefaultError);
-  
+
   return ret.getPayload.contents.length > 0 ? RetType(ret.getPayload) :
     RetType(DefaultError("Regex+ didn't find any " ~ RP.stringof));
 }
@@ -231,11 +231,11 @@ if(isInstanceOf!(Optional, Opt)){
   alias ResPayloadType = typeof(res).PayloadType;
   alias PayloadType = Payload!(Nullable!(typeof(res).PayloadType.Types));
   alias RetType = ParseResult!(PayloadType, DefaultError); //todo, no error
-  
+
   return res.data.match!(
     (ResPayloadType pt) => RetType(PayloadType(nullable(res.getPayload.contents))),
     _ => RetType(PayloadType())); //successful, but just holds null
-  
+
  }
 
 ///parse a choice between alternatives.  Return the first successful option
@@ -247,7 +247,7 @@ if(isInstanceOf!(OneOf, OO)){
   alias Ts = TemplateArgsOf!(OO.NodeType);
   alias PayloadType = Payload!(OO.NodeType);
   alias RetType = ParseResult!(PayloadType, DefaultError);
-  
+
   static foreach(T; Ts){{
       TokenStream copy = tokenStream; //only advance the stream on success
       auto res = parse!T(copy);
@@ -256,7 +256,7 @@ if(isInstanceOf!(OneOf, OO)){
         tokenStream = copy;
         return RetType(PayloadType(oont));
       }
-      
+
   }}
   return RetType(DefaultError("None of " ~ Ts.stringof ~ " could be parsed"));
 
@@ -274,8 +274,8 @@ if(isInstanceOf!(InRange, IR)){
   enum last = TemplateArgsOf!IR[1];
 
   static assert(!is(CommonType!(IR.LimitType, ElementType!TokenStream) == void));
-                
-  
+
+
   alias PayloadType = Payload!(CommonType!(IR.LimitType, ElementType!TokenStream));
   alias RetType = ParseResult!(PayloadType, DefaultError);
 
@@ -292,7 +292,7 @@ if(isInstanceOf!(InRange, IR)){
     RTLog("didn't find it, returning false");
     return RetType(DefaultError("Looking for "~ IR.stringof ~ " but found "~ to!string(tokenStream.front)));
   }
-  
+
 }
 
 ///returns true if you cannot parse N from the stream right now
@@ -313,7 +313,7 @@ if(isInstanceOf!(Not, N)){
   if(!ret.isParseError){
     return RetType(DefaultError("Not failed, could parse " ~ typeof(ret).stringof));
   } else {
-    
+
     RTLog("returning from Not element, `", N.stringof, "`, from stream: ", tokenStream, " with ", ret);
     return RetType(PayloadType());
   }
@@ -323,16 +323,16 @@ if(isInstanceOf!(Not, N)){
 ///returns the next token, whatever it is
 auto parse(T, TokenStream)(ref TokenStream tokenStream)
 if(is(ElementType!TokenStream : T) || is (T : Token)){
-  
+
   mixin CTLog!("Parser for wildcard token");
   RTLog("parsing wildcard token from stream: ", tokenStream);
 
   alias U = typeof(tokenStream.front());
   alias PayloadType = Payload!U;
   alias RetType = ParseResult!(PayloadType, DefaultError);
-  
+
   if(tokenStream.empty){ return RetType(DefaultError("empty stream")); }
-  
+
   auto ret = tokenStream.front;
   tokenStream.popFront;
   return RetType(PayloadType(ret));
@@ -345,10 +345,10 @@ auto parse(TokenStream)(ref TokenStream tokenStream)
 
   mixin CTLog!("Parser for Sequence `", Ts, "`");
   RTLog("parsing `", Ts.stringof, "` from stream: ", tokenStream);
-  
+
   import std.typecons : Tuple;
   import std.meta : ReplaceAll, Filter;
-  
+
 
   alias TType = ElementType!TokenStream;
   alias TokensReplaced = ReplaceTokensRecursive!(TType, Ts);
@@ -360,11 +360,11 @@ auto parse(TokenStream)(ref TokenStream tokenStream)
   RetType ret;
   alias PayloadType = Payload!RetType;
   alias ResultType = ParseResult!(PayloadType, DefaultError);
-  
+
   static size_t argNumber(size_t syntaxNumber)(){
     size_t v = 0;
     static foreach(i; 0..syntaxNumber){
-      static if(!isInstanceOf!(Not, Ts[i])){ 
+      static if(!isInstanceOf!(Not, Ts[i])){
         ++v;
       }
     }
@@ -427,7 +427,7 @@ auto parse(alias Lit, TokenStream)(ref TokenStream tokenStream){
       if(!ret.isParseError)
         tokenStream.popFront;
       return ret;
-      
+
     } else { //stream is probably a dchar[]
       if(tokenStream.front == Lit){
         RTLog("found it, returning true");
@@ -501,7 +501,7 @@ Target convert(Target, Src)(Src src){
   import std.traits : isNarrowString;
   import std.utf : byCodeUnit;
   import std.typecons : isTuple;
-  
+
   mixin CTLog!("convert, src ", Src, " Target: ", Target);
   RTLog("Converting ", src, " to type ", Target.stringof);
   static if(is(Src : Target)){
@@ -556,10 +556,10 @@ template Matches(Src, Target){
     enum Matches = anySatisfy!(MatchOne, OOArgs);
     pragma(msg, "any satisfy case for ", Src, " and ", Target, " is ", Matches);
   } else static if(is(Target == OneOf!OOArgs.NodeType, OOArgs...)){
-    
+
     enum MatchOne(alias X) = isType!X && .Matches!(Src, X);
     enum DirectMatch = anySatisfy!(MatchOne, OOArgs);
-    
+
     static if(DirectMatch){
       enum Matches = true;
     } else {
@@ -588,7 +588,7 @@ template Matches(Src, Target){
   } else {
     enum Matches = is(Target: Src);
   }
-  
+
   mixin CTLog!(Src, "matches ", Target, "?: ",  Matches);
 }
 
@@ -601,7 +601,7 @@ enum size_t SkipArg = -2; //this syntax element shouldn't get passed to a constr
 template ArgRanges(CA, TA, size_t Ci){
 
   /*
-    Cargs empty? 
+    Cargs empty?
       Targs empty or skippable?  OK, we're done
       Otherwise: error
 
@@ -616,14 +616,14 @@ template ArgRanges(CA, TA, size_t Ci){
       otherwise error
 
     Current Carg is a tuple?
-    
+
    */
 
   alias Cargs = TemplateArgsOf!CA;
   alias Targs = TemplateArgsOf!TA;
 
   mixin CTLog!("computing arg ranges with Cargs: ", Cargs, " and Targs ", Targs);
-  
+
   static if(Cargs.length == 0){
     static if(Targs.length == 0){
       enum size_t[] ArgRanges = []; //all done
@@ -631,7 +631,7 @@ template ArgRanges(CA, TA, size_t Ci){
       enum size_t[] ArgRanges = [-1]; //unmatched Synax params
     }
   } else static if(Targs.length == 0){
-    
+
     static if(isArray!(Cargs[0])){
       //done with this array element, move on, and hopefully this is the last carg
       //todo verify that at least 1 Targs is assigned to each Carg array element
@@ -639,7 +639,7 @@ template ArgRanges(CA, TA, size_t Ci){
     } else {
       enum size_t[] ArgRanges = [-1];
     }
-    
+
   } else static if(isArray!(Cargs[0])){
 
     static if(isArray!(Targs[0])){
@@ -650,7 +650,7 @@ template ArgRanges(CA, TA, size_t Ci){
         //Different element types, could be OK if the previous Targ matched this array
         enum size_t[] ArgRanges = .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
       }
-      
+
     } else {
       alias base = ElementType!(Cargs[0]);
       //TODO, let Matches handle nullables for us?
@@ -665,7 +665,7 @@ template ArgRanges(CA, TA, size_t Ci){
           //move along
           enum size_t[] ArgRanges = .ArgRanges!(Wrap!(Cargs[1..$]), TA, Ci + 1);
         }
-        
+
       } else static if(Matches!(base, Targs[0])){
         //Ti can be part of the array at Ci
         enum size_t[] ArgRanges = [Ci] ~ .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
@@ -683,7 +683,7 @@ template ArgRanges(CA, TA, size_t Ci){
         enum size_t[] ArgRanges = .ArgRanges!(Wrap!(Cargs[1..$]), TA, Ci +1);
       }
     }
-    
+
   } else {
     static if(Matches!(Cargs[0], Targs[0])){
       //Ti will be passed for Ci
@@ -723,7 +723,7 @@ auto simplifyPayload(bool KeepTokens = false, T)(T t){
         }
         return ret;
       }
-      
+
       static foreach(i; 0..T.Types.length){
         static if(!is(SimplifiedTypes[i] == void)){
           ret[filteredIndexOf!i] = simplifyPayload(t[i]);
@@ -736,7 +736,7 @@ auto simplifyPayload(bool KeepTokens = false, T)(T t){
         return tuple(ret);
       }
     }
-    
+
   } else static if(isArray!T){
     return t.map!simplifyPayload.array;
   } else static if(is(T: OneOf!Args.NodeType, Args...)){
@@ -778,7 +778,7 @@ T construct(T, Args)(Args args){
 
   pragma(msg, "simplified type of ", Args, " is ", Stype);
 
-  
+
   static if(is(Stype : T)){
     pragma(msg, "simplified version implicitly converts, cool");
     return make!T(simplified);
@@ -793,13 +793,13 @@ T construct(T, Args)(Args args){
       static assert(Cargs.length == 1, "One arg simplified type");
       return make!T(convert!(Cargs.Types[0])(simplified));
     } else {
-    
+
 
       enum AR = ArgRanges!(Cargs, Stype, 0);
       pragma(msg, "Cargs: ", Cargs, " Stype: ", Stype, " AR: ", AR);
-      
+
       Cargs cargs;
-      
+
       static foreach(i, ar; AR){
         pragma(msg, "i: ", i, " ar: ", ar);
         static if(isArray!(Cargs[ar])){
@@ -808,7 +808,7 @@ T construct(T, Args)(Args args){
           cargs[ar] = convert!(Cargs.Types[ar])(simplified[i]);
         }
       }
-      
+
       return make!T(cargs.expand);
     }
   }
