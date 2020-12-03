@@ -349,10 +349,11 @@ auto parse(TokenStream)(ref TokenStream tokenStream)
   import std.typecons : Tuple;
   import std.meta : ReplaceAll, Filter;
   
-  //alias Ts = S.Elements;
+
   alias TType = ElementType!TokenStream;
   alias TokensReplaced = ReplaceTokensRecursive!(TType, Ts);
-  alias Values = ValueTypes!(TokenStream, TokensReplaced);
+  alias ParseOne(alias X) = ReturnType!( () => .parse!X(tokenStream)).PayloadType.Types;
+  alias Values = EraseAll!(void, staticMap!(ParseOne, Ts));
 
   alias RetType = Tuple!Values;
 
@@ -392,51 +393,11 @@ auto parse(TokenStream)(ref TokenStream tokenStream)
         set!(argNumber!i)(piece.getPayload.contents);
       }
     }}
-    tokenStream = copy;
+  tokenStream = copy;
   return ResultType(PayloadType(ret));
 
-}
-}
-
-template hasValue(alias T){
-  enum hasValue = isType!T && !isInstanceOf!(Not, T);
-}
-
-template ValueTypes(TokenStream, Ts...){
-
-  import std.meta : staticMap, Filter;
-
-  alias TsWithValues = Filter!(hasValue, Ts);
-
-  enum notNot(alias X) = !isInstanceOf!(Not, X);
-  alias ValuesWithoutNots = Filter!(notNot, Ts);
-  alias ValTypeWrapper(alias X) = ValueType!(TokenStream, X);
-  alias ValueTypes = staticMap!(ValTypeWrapper, ValuesWithoutNots);
-  mixin CTLog!("ValueTypes of ", Ts, " are ", ValueTypes);
-}
-
-template ValueType(TokenStream, alias T){
-  static if(isInstanceOf!(OneOf, T)){
-    alias ValueType = T.NodeType;
-  } else static if(isInstanceOf!(InRange, T)){
-    alias ValueType = T.LimitType;
-  } else static if(isInstanceOf!(RegexStar, T) || isInstanceOf!(RegexPlus, T)){
-    alias ChildType = ReturnType!(
-      (TokenStream ts) => parse!(TemplateArgsOf!T)(ts) ).PayloadType.Types;
-    alias ValueType = SliceOf!ChildType;
-  } else static if(isInstanceOf!(Optional, T)){
-    alias ChildType = ReturnType!(
-      (TokenStream ts) => parse!(TemplateArgsOf!T)(ts)).PayloadType.Types;
-    alias ValueType = Nullable!ChildType;
-  } else static if(!isType!T){
-    //type for literals
-    alias ValueType = TokenType!T;
-  } else {
-    alias ValueType = T;
   }
-  mixin CTLog!("val type for ", T, " is ", ValueType);
 }
-
 
 ///Is a literal at the front?
 auto parse(alias Lit, TokenStream)(ref TokenStream tokenStream){
@@ -832,31 +793,6 @@ auto simplifyPayload(T)(T t){
     return t;
   }
 }
-
-
-
-
-/* Construct calls that from JSON that make sense...
-
-
-tuple("calling construct to make a ", (Whitespace), " from ", (NodeType[]))
-tuple("calling construct to make a ", (QuotedString), " from ", (Tuple!(TokenType!('"'), Tuple!dchar[], TokenType!('"'))))
-IFFY: tuple("calling construct to make a ", (const(dchar)[]), " from ", (Tuple!(TokenType!('"'), Tuple!dchar[], TokenType!('"'))))
-IFFY: tuple("calling construct to make a ", (const(dchar)), " from ", (dchar))
-
-tuple("calling construct to make a ", (Number), " from ", (Tuple!(Nullable!(TokenType!('-')), dchar[], Nullable!(TokenType!('.')), dchar[])))
-iffy tuple("calling construct to make a ", (string), " from ", (Tuple!(Nullable!(TokenType!('-')), dchar[], Nullable!(TokenType!('.')), dchar[])))
-
-
-tuple("calling construct to make a ", (JSONArray), " from ", (Tuple!(TokenType!('['), Tuple!(NodeType, TokenType!(','))[], Nullable!(NodeType), TokenType!(']'))))
-tuple("calling construct to make a ", (NodeType[]), " from ", (Tuple!(TokenType!('['), Tuple!(NodeType, TokenType!(','))[], Nullable!(NodeType), TokenType!(']'))))
-IFFY tuple("calling construct to make a ", (NodeType[]), " from ", (TokenType!('[')), (Tuple!(NodeType, TokenType!(','))[]), (Nullable!(NodeType)), (TokenType!(']')))
-
-tuple("calling construct to make a ", (NodeType), " from ", (Tuple!(NodeType, TokenType!(','))))
-IFFY: tuple("calling construct to make a ", (NodeType), " from ", (NodeType), (TokenType!(',')))
-
- */
-
 
 auto make(T, Args...)(Args args){
   static if(is(T == class)){
