@@ -115,8 +115,12 @@ unittest{
   auto jo = parse!JSONObject(tokens).getPayload.contents;
   writeln("\n\n\n", jo, "\n\n\n");
   jo[QuotedString("key")].data.match!(
-    (Number n){assert(n.val == 45); return 0;},
-    (_){assert(false); return 0;});
+    (Number n){assert(n.val == 45);},
+    (_){assert(false);});
+
+  jo[QuotedString("anArray")].data.match!(
+    (JSONArray arr){assert(arr.length == 3);},
+    (_){assert(false);});
 
   double[] numbers = [1, -10, 37.5, 36., -.98];
   foreach(number; numbers){
