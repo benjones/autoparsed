@@ -457,8 +457,6 @@ template CArgs(T){
   }
 }
 
-enum MultiArgConstructor(T) = isAggregateType!T || isTuple!T;
-
 template CommonValueType(T) if(is(T : OneOf!Args.NodeType, Args...)){
   import std.meta : allSatisfy;
 
@@ -529,6 +527,7 @@ Target convert(Target, Src)(Src src){
       return map!(convert!(ForeachType!Target, ForeachType!Src))(src).array;
     }
   } else static if(isInstanceOf!(Nullable, Src)){
+    //BUG: should probably consider nullable Targets
     RTLog("Type is nullable");
     Target ret = [];
     pragma(msg, "convert dealing with a nullable, about to convert a ", typeof(src.get()), " to a ", ElementType!Target);
@@ -628,13 +627,9 @@ template ArgRanges(CA, TA, size_t Ci){
   static if(Cargs.length == 0){
     static if(Targs.length == 0){
       enum size_t[] ArgRanges = []; //all done
-    } else static if(isInstanceOf!(TokenType, Targs[0])){
-      //Token types have no value, skip them
-      enum size_t[] ArgRanges = [SkipArg] ~ .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
     } else {
       enum size_t[] ArgRanges = [-1]; //unmatched Synax params
     }
-    
   } else static if(Targs.length == 0){
     
     static if(isArray!(Cargs[0])){
@@ -650,20 +645,19 @@ template ArgRanges(CA, TA, size_t Ci){
     static if(isArray!(Targs[0])){
       static if(Matches!(ElementType!(Cargs[0]), ElementType!(Targs[0]))){
         enum size_t[] ArgRanges = [Ci] ~ //Ti matches Ci, continue
-          .ArgRanges!(Wrap!(Cargs), Wrap!(Targs[1..$]), Ci);
+          .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
       } else {
-        //Different element types, could be OK if the Targ matched this array
+        //Different element types, could be OK if the previous Targ matched this array
         enum size_t[] ArgRanges = .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
       }
       
     } else {
       alias base = ElementType!(Cargs[0]);
-      static if(isInstanceOf!(TokenType, Targs[0])){
-        //Targ is unused, move on
-        enum size_t[] ArgRanges = [SkipArg] ~ .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
-      } else static if(isInstanceOf!(Nullable, Targs[0])){
+      //TODO, let Matches handle nullables for us?
+      static if(isInstanceOf!(Nullable, Targs[0])){
         //Nullables match either nullables or array, try to match it to an array
-        enum matches = Matches!(base, TemplateArgsOf!(Targs[0]));
+        //keep token types when we simplify.  Works for things like Optional(-), but may not be right in general?
+        enum matches = Matches!(base, ReturnType!(simplifyPayload!(true,TemplateArgsOf!(Targs[0]))));
         static if(matches){
           //cool
           enum size_t[] ArgRanges = [Ci] ~ .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
@@ -674,7 +668,6 @@ template ArgRanges(CA, TA, size_t Ci){
         
       } else static if(Matches!(base, Targs[0])){
         //Ti can be part of the array at Ci
-        pragma(msg, "checking array base type match for ", Cargs, " and ", Targs);
         enum size_t[] ArgRanges = [Ci] ~ .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
       } else static if(isTuple!(Targs[0])){
         pragma(msg, "checking array tuple match for ", Cargs, " and ", Targs);
@@ -692,10 +685,7 @@ template ArgRanges(CA, TA, size_t Ci){
     }
     
   } else {
-    static if(isInstanceOf!(TokenType, Targs[0])){
-      //Targ is unused, move on
-      enum size_t[] ArgRanges = [SkipArg] ~ .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
-    } else static if(Matches!(Cargs[0], Targs[0])){
+    static if(Matches!(Cargs[0], Targs[0])){
       //Ti will be passed for Ci
       enum size_t[] ArgRanges = [Ci] ~
         .ArgRanges!(Wrap!(Cargs[1..$]), Wrap!(Targs[1..$]), Ci + 1);
@@ -706,54 +696,25 @@ template ArgRanges(CA, TA, size_t Ci){
   }
 }
 
-template directlyAssignable(T, Args...){
-  pragma(msg, "directly assignable? ", T, " from ", Args);
-  static if(Args.length != 1){
-    enum directlyAssignable = false;
-  } else static if( is(Args[0] : T)){
-    enum directlyAssignable = true;
-  } else static if(isTuple!(Args[0])){
-    import std.algorithm : canFind;
-    enum AR = ArgRanges!(Wrap!T, Wrap!(Args[0].Types), 0);
 
-    bool argsCheck()(){
-      static foreach(i, ar; AR){
-        static if(ar < Args[0].length){
-          pragma(msg, "arg check: ", i, " ", ar, " ", Args[0].Types[i], " ", is(Args[0].Types[i] : T));
-        }
-        static if(ar == -1)
-          return false;
-        else static if(ar != SkipArg && !is(Args[0].Types[i] : T))
-          return false;
-      }
-      return true;
-    }
-    pragma(msg, "AR before argsCheck: ", AR);
-    enum directlyAssignable = argsCheck!()();
-    
-  } else {
-    enum directlyAssignable = false;
-  }
-}
-
-
-auto simplifyPayload(T)(T t){
+auto simplifyPayload(bool KeepTokens = false, T)(T t){
   pragma(msg, "Simpligying T: ", T);
+
   static if(isTuple!T && !isInstanceOf!(Nullable, T)){
-    
+
     alias SimplifiedType(X) = ReturnType!( () => simplifyPayload(X.init));
     alias SimplifiedTypes = staticMap!(SimplifiedType, T.Types);
     pragma(msg, "simplified types for ", T.Types, " are ", SimplifiedTypes);
-    
+
     alias FilteredTypes = EraseAll!(void, SimplifiedTypes);
     pragma(msg, "filtered types are ", FilteredTypes);
-    
+
     FilteredTypes ret;
-    
+
     static if(FilteredTypes.length == 0){
       return; //void
     } else {
-      
+
       auto filteredIndexOf(size_t i)(){
         size_t ret  = 0;
         static foreach(ind; 0.. i){
@@ -788,7 +749,11 @@ auto simplifyPayload(T)(T t){
     }
 
   } else static if(isInstanceOf!(TokenType, T)){
-    return; //void
+    static if(KeepTokens){
+      return T.value;
+    } else {
+      return; //void
+    }
   } else {
     return t;
   }
