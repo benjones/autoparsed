@@ -7,48 +7,28 @@ import std.stdio;
 import std.conv : to;
 import std.typecons;
 import std.traits;
-import std.meta : AliasSeq, EraseAll;
+import std.meta;
 import std.algorithm;
 import std.array;
 import std.range.primitives;
 
 import sumtype;
 
-template TypesOnly(T...){
-  import std.meta;
-  alias TypesOnly = Filter!(isType, T);
-}
-
-enum hasUDASafe(alias X, alias UDA) = __traits(compiles, hasUDA!(X, UDA)) && hasUDA!(X, UDA);
-enum isArraySafe(X...) = __traits(compiles, isArray!X) && isArray!X;
-
-
-unittest {
-
-  enum UDA;
-
-  @UDA struct S1{}
-  struct S2{}
-
-  static assert(hasUDASafe!(S1, UDA));
-  static assert(!hasUDASafe!(S2, UDA));
-  static assert(!hasUDASafe!(dchar, UDA));
-
-}
-
+///Common type returned on a successful call to parse
 struct Payload(T){
   alias Types = T;
   static if(!is(Types == void))
     Types contents;
 }
-
+///Common type returned on a parse failure
 struct ParseError(T){
   alias Types = T;
   T contents;
 }
-
+///By default the error just contains a string
 alias DefaultError = ParseError!string;
 
+///Common type for all the parse functions.  Either a payload or an error
 struct ParseResult(P, PE)
 if(is(P : Payload!Args1, Args1...) && is(PE : ParseError!Args2, Args2)){
   SumType!(P, PE) data;
@@ -58,18 +38,19 @@ if(is(P : Payload!Args1, Args1...) && is(PE : ParseError!Args2, Args2)){
   this(PE pe){ data = pe;}
 }
 
+///
 bool isParseError(PR: ParseResult!(P, PE), P, PE)(PR pr){
   return pr.data.match!(
     (P p) => false,
     (PE pe) => true);
 }
-
+///
 auto getPayload(PR: ParseResult!(P, PE), P, PE)(PR pr){
   return pr.data.match!(
     (P p) => p,
     function P(PE _){assert(false);});
 }
-
+///
 auto getParseError(PR: ParseResult!(P, PE), P, PE)(PR pr){
   return pr.data.match!(
     (PE pe) => pe,
@@ -83,19 +64,44 @@ unittest {
   alias PEString = ParseError!string;
   ParseResult!(PInt, PEString) p1;
   ParseResult!(PTuple, PEString) p2;
+
+  p1 =typeof(p1)( PInt(5));
+  assert(p1.getPayload.contents == 5);
+
+  p2 = typeof(p2)(PTuple(tuple(3, "hello", 2.5)));
+  assert(p2.getPayload.contents == tuple(3, "hello", 2.5));
+
+  p1 = typeof(p1)(DefaultError("uh oh"));
+  assert(p1.isParseError);
+  assert(p1.getParseError.contents == "uh oh");
 }
 
-
-template contains(T, Ts...) {
-  import std.meta : anySatisfy;
-  enum isSame(U) = allSameType!(T, U);
-  alias contains = anySatisfy!(isSame, Ts);
-}
 
 template partOfStream(T, StreamElement){
+  private template contains(T, Ts...) {
+    enum isSame(U) = allSameType!(T, U);
+    alias contains = anySatisfy!(isSame, Ts);
+  }
+
   enum partOfStream = is(StreamElement == OneOf!Args.NodeType, Args...) &&
     contains!(T, TemplateArgsOf!(StreamElement.ST));
 }
+
+enum hasUDASafe(alias X, alias UDA) = __traits(compiles, hasUDA!(X, UDA)) && hasUDA!(X, UDA);
+enum isArraySafe(X...) = __traits(compiles, isArray!X) && isArray!X;
+
+unittest {
+
+  enum UDA;
+
+  @UDA struct S1{}
+  struct S2{}
+
+  static assert(hasUDASafe!(S1, UDA));
+  static assert(!hasUDASafe!(S2, UDA));
+  static assert(!hasUDASafe!(dchar, UDA));
+}
+
 
 ///return a T if it's at the front of the stream
 auto parse(T, TokenStream)(ref TokenStream tokenStream)
@@ -123,7 +129,6 @@ if(hasUDASafe!(T, Token) &&
 ///Parse a token, forwards either to another overload, or the literal checker
 auto parse(T, TokenStream)(ref TokenStream tokenStream)
 if(isInstanceOf!(TokenType, T)){
-  import std.traits: isType;
   mixin CTLog!("Forwarding Parser for TokenType wrapper `", T, "`");
 
   alias TArgs = TemplateArgsOf!T;
@@ -139,9 +144,7 @@ template SyntaxReturnType(T){
 ///parse an element that has a constructor annotated with the @Syntax UDA
 SyntaxReturnType!T parse(T, TokenStream)(ref TokenStream tokenStream)
 if(hasUDASafe!(T, Syntax) && !partOfStream!(T, typeof(tokenStream.front()))) {
-  import std.traits : getUDAs, isType, Parameters;
   import std.range: iota;
-  import std.meta : Filter, staticMap, aliasSeqOf;
 
   alias syntax = getUDAs!(T, Syntax)[0];
 
@@ -346,10 +349,6 @@ auto parse(TokenStream)(ref TokenStream tokenStream)
   mixin CTLog!("Parser for Sequence `", Ts, "`");
   RTLog("parsing `", Ts.stringof, "` from stream: ", tokenStream);
 
-  import std.typecons : Tuple;
-  import std.meta : ReplaceAll, Filter;
-
-
   alias TType = ElementType!TokenStream;
   alias TokensReplaced = ReplaceTokensRecursive!(TType, Ts);
   alias ParseOne(alias X) = ReturnType!( () => .parse!X(tokenStream)).PayloadType.Types;
@@ -458,7 +457,6 @@ template CArgs(T){
 }
 
 template CommonValueType(T) if(is(T : OneOf!Args.NodeType, Args...)){
-  import std.meta : allSatisfy;
 
   template isValueToken(T){
     static if(isInstanceOf!(TokenType,T)){
@@ -497,10 +495,7 @@ template CommonValueType(T) if(is(T : OneOf!Args.NodeType, Args...)){
 
 
 Target convert(Target, Src)(Src src){
-  import std.conv : to;
-  import std.traits : isNarrowString;
   import std.utf : byCodeUnit;
-  import std.typecons : isTuple;
 
   mixin CTLog!("convert, src ", Src, " Target: ", Target);
   RTLog("Converting ", src, " to type ", Target.stringof);
@@ -517,8 +512,6 @@ Target convert(Target, Src)(Src src){
     return to!Target(val);
 
   } else static if(isArray!Target && isArray!Src){
-    import std.algorithm: map;
-    import std.array;
     RTLog("doing array conversion... Converting ", src, " of type ", Src.stringof, " to ", Target.stringof);
     static if(isNarrowString!Src){
       //fun with autodecoding!
@@ -547,8 +540,6 @@ Target convert(Target, Src)(Src src){
 
 //src is the constructor arg.  Target is the syntax element
 template Matches(Src, Target){
-  import std.meta : anySatisfy;
-  import std.algorithm : canFind;
   mixin CTLog!("Match check: ", Src, " ", Target);
   static if(is(Src == OneOf!OOArgs.NodeType, OOArgs...)){
     enum MatchOne(alias X) = isType!X && .Matches!(X, Target);
@@ -839,7 +830,6 @@ template ReplaceTokenRecursive(Replacement, T){
 }
 
 template ReplaceTokensRecursive(Replacement, Ts...){
-  import std.meta : staticMap;
   alias F(alias T) = ReplaceTokenRecursive!(Replacement, T);
   alias ReplaceTokensRecursive = staticMap!(F, Ts);
 
