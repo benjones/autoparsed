@@ -172,21 +172,14 @@ if(isInstanceOf!(RegexStar, RS)){
   mixin CTLog!("Parser for RegexStar `", RS, "`");
   RTLog("parsing `", RS.stringof, "` from stream: ", tokenStream);
 
-  alias Elems = TemplateArgsOf!RS;
-  static if(Elems.length > 1){
-    alias ElemType = AliasSeq!(Elems);
-  } else {
-    alias ElemType = Elems[0];
-    static assert(!isInstanceOf!(Optional, ElemType), "RegexStar of an Optional doesn't make sense");
-  }
-
+  alias ElemType = TemplateArgsOf!RS;
   mixin CTLog!("Elem type: `", ElemType, "`");
 
 
   TokenStream copy = tokenStream;
   auto elem = parse!ElemType(copy);
 
-  alias RetType = typeof(elem).PayloadType.Types; //? always 1 arg here?
+  alias RetType = typeof(elem).PayloadType.Types;
 
   RetType[] ret;
 
@@ -341,7 +334,9 @@ if(is(ElementType!TokenStream : T) || is (T : Token)){
   return RetType(PayloadType(ret));
 }
 
-///parse a sequence of tokens in orders
+///parse a sequence of tokens in order
+///the template trick so that parse!Ts(stream) infers stream,
+///but lets the caller specify a variadic set of types
 template parse(Ts...){
 auto parse(TokenStream)(ref TokenStream tokenStream)
   if(Ts.length > 1){ //isInstanceOf!(Sequence, S)){
@@ -442,6 +437,8 @@ auto parse(alias Lit, TokenStream)(ref TokenStream tokenStream){
   }
 }
 
+private:
+
 template CArgs(T){
   pragma(msg, "getting CArgs of ", T);
   static assert(isType!T);
@@ -495,7 +492,6 @@ template CommonValueType(T) if(is(T : OneOf!Args.NodeType, Args...)){
 
 
 Target convert(Target, Src)(Src src){
-  import std.utf : byCodeUnit;
 
   mixin CTLog!("convert, src ", Src, " Target: ", Target);
   RTLog("Converting ", src, " to type ", Target.stringof);
@@ -515,17 +511,15 @@ Target convert(Target, Src)(Src src){
     RTLog("doing array conversion... Converting ", src, " of type ", Src.stringof, " to ", Target.stringof);
     static if(isNarrowString!Src){
       //fun with autodecoding!
+      import std.utf : byCodeUnit;
       return map!(convert!(ForeachType!Target, ForeachType!Src))(src.byCodeUnit).array;
     } else {
       return map!(convert!(ForeachType!Target, ForeachType!Src))(src).array;
     }
   } else static if(isInstanceOf!(Nullable, Src)){
     //BUG: should probably consider nullable Targets
-    RTLog("Type is nullable");
     Target ret = [];
-    pragma(msg, "convert dealing with a nullable, about to convert a ", typeof(src.get()), " to a ", ElementType!Target);
     if(!src.isNull()) ret = to!Target([convert!(ElementType!Target)(src.get)]);
-    RTLog("conversion result is: `", ret, "`");
     return ret;
   } else static if(isInstanceOf!(TokenType, Src)){
     return convert!Target(src.value);
@@ -543,9 +537,7 @@ template Matches(Src, Target){
   mixin CTLog!("Match check: ", Src, " ", Target);
   static if(is(Src == OneOf!OOArgs.NodeType, OOArgs...)){
     enum MatchOne(alias X) = isType!X && .Matches!(X, Target);
-    pragma(msg, "any satisfy case");
     enum Matches = anySatisfy!(MatchOne, OOArgs);
-    pragma(msg, "any satisfy case for ", Src, " and ", Target, " is ", Matches);
   } else static if(is(Target == OneOf!OOArgs.NodeType, OOArgs...)){
 
     enum MatchOne(alias X) = isType!X && .Matches!(Src, X);
@@ -559,6 +551,7 @@ template Matches(Src, Target){
     }
   } else static if(isInstanceOf!(Nullable, Target)){
     //BUG!!! What about truly optional parameters?
+    alias SliceOf(x)  = X[];
     enum Matches = .Matches!(Src, SliceOf!(TemplateArgsOf!Target));
   } else static if(isInstanceOf!(TokenType, Target)){
     enum Matches =  is(Target.type : Src);
@@ -583,7 +576,7 @@ template Matches(Src, Target){
   mixin CTLog!(Src, "matches ", Target, "?: ",  Matches);
 }
 
-private struct Wrap(T...){}
+struct Wrap(T...){}
 
 
 enum size_t SkipArg = -2; //this syntax element shouldn't get passed to a constructor
@@ -836,11 +829,6 @@ template ReplaceTokensRecursive(Replacement, Ts...){
 }
 
 unittest {
-    //  static assert(is(ReplaceTokensRecursive!(dchar, '"', (RegexStar!(Not!'"', Token)), '"', "`") ==
-    //                   RegexStar!(Not!'"', dchar)));
-}
-
-
-template SliceOf(T){
-  alias SliceOf = T[];
+  static assert(is(ReplaceTokensRecursive!(dchar,  (RegexStar!(Not!'"', Token))) ==
+                   AliasSeq!(RegexStar!(Not!'"', dchar))));
 }
