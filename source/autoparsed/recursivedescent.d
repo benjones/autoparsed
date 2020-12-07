@@ -240,7 +240,7 @@ if(isInstanceOf!(OneOf, OO)){
   mixin CTLog!("Parser for OneOf `", OO, "`");
   RTLog("parsing `", OO.stringof, "` from stream: ", tokenStream);
 
-  alias Ts = TemplateArgsOf!(OO.NodeType);
+  alias Ts = TemplateArgsOf!(OO);
   alias PayloadType = Payload!(OO.NodeType);
   alias RetType = ParseResult!(PayloadType, DefaultError);
 
@@ -248,6 +248,7 @@ if(isInstanceOf!(OneOf, OO)){
       TokenStream copy = tokenStream; //only advance the stream on success
       auto res = parse!T(copy);
       if(!res.isParseError){
+
         auto oont = OO.NodeType(res.getPayload.contents);
         tokenStream = copy;
         return RetType(PayloadType(oont));
@@ -440,7 +441,6 @@ auto parse(alias Lit, TokenStream)(ref TokenStream tokenStream){
 private:
 
 template CArgs(T){
-  pragma(msg, "getting CArgs of ", T);
   static assert(isType!T);
   static if(!isAggregateType!T){
     alias CArgs = Tuple!(Unqual!T);
@@ -453,40 +453,6 @@ template CArgs(T){
   }
 }
 
-template CommonValueType(T) if(is(T : OneOf!Args.NodeType, Args...)){
-
-  template isValueToken(T){
-    static if(isInstanceOf!(TokenType,T)){
-      enum isValueToken = !isType!(TemplateArgsOf!T[0]);
-    } else {
-      enum isValueToken = false;
-    }
-  }
-
-  enum allValueTokens = allSatisfy!(isValueToken, TemplateArgsOf!T);
-  static if(allValueTokens){
-
-    alias getValue(T)= TemplateArgsOf!T[0];
-    alias TokenValues = staticMap!(getValue, TemplateArgsOf!T);
-    alias getType(alias V) = typeof(V);
-    alias ValueTypes = staticMap!(getType, TokenValues);
-
-    alias CT = CommonType!(ValueTypes);
-    static if(is(CT == void)){
-      enum HasCommonType = false;
-    } else {
-      enum HasCommonType = true;
-      alias CommonValueType = CT;
-    }
-
-  } else {
-    enum HasCommonType = false;
-  }
-
-  static if(!HasCommonType){
-    alias CommonValueType = void;
-  }
-}
 
 
 
@@ -535,7 +501,9 @@ Target convert(Target, Src)(Src src){
 //src is the constructor arg.  Target is the syntax element
 template Matches(Src, Target){
   mixin CTLog!("Match check: ", Src, " ", Target);
-  static if(is(Src == OneOf!OOArgs.NodeType, OOArgs...)){
+  static if(is(Target : Src) || is(typeof(Src(Target.init)))){
+    enum Matches = true;
+  } else static if(is(Src == OneOf!OOArgs.NodeType, OOArgs...)){
     enum MatchOne(alias X) = isType!X && .Matches!(X, Target);
     enum Matches = anySatisfy!(MatchOne, OOArgs);
   } else static if(is(Target == OneOf!OOArgs.NodeType, OOArgs...)){
@@ -570,7 +538,7 @@ template Matches(Src, Target){
   } else static if(isArray!Src){
     enum Matches = isArray!Target && Matches!(ElementType!Src, ElementType!Target);
   } else {
-    enum Matches = is(Target: Src);
+    enum Matches = false;
   }
 
   mixin CTLog!(Src, "matches ", Target, "?: ",  Matches);
@@ -654,7 +622,6 @@ template ArgRanges(CA, TA, size_t Ci){
         //Ti can be part of the array at Ci
         enum size_t[] ArgRanges = [Ci] ~ .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
       } else static if(isTuple!(Targs[0])){
-        pragma(msg, "checking array tuple match for ", Cargs, " and ", Targs);
         enum tupleMatches = Matches!(Cargs[0], Targs[0]);
         static if(tupleMatches){
           //move along
@@ -678,6 +645,8 @@ template ArgRanges(CA, TA, size_t Ci){
       enum size_t[] ArgRanges = [-1];
     }
   }
+
+  mixin CTLog!("results of AR with Cargs: ", Cargs, " and Targs: ", Targs, " is : ", ArgRanges);
 }
 
 
@@ -721,14 +690,7 @@ auto simplifyPayload(bool KeepTokens = false, T)(T t){
   } else static if(isArray!T){
     return t.map!simplifyPayload.array;
   } else static if(is(T: OneOf!Args.NodeType, Args...)){
-    //can a common type work for all the variants?
-    alias CVT = CommonValueType!T;
-    static if(is(CVT == void)){
-      return t;
-    } else {
-      return CVT(t.match!(x => x.value));
-    }
-
+    return t.data;
   } else static if(isInstanceOf!(TokenType, T)){
     static if(KeepTokens){
       return T.value;
@@ -776,9 +738,9 @@ T construct(T, Args)(Args args){
       enum AR = ArgRanges!(Cargs, Stype, 0);
 
       Cargs cargs;
-
       static foreach(i, ar; AR){
-        static if(isArray!(Cargs[ar])){
+
+        static if(isArray!(typeof(cargs[ar]))){
           cargs[ar] ~= convert!(Cargs.Types[ar])(simplified[i]);
         } else {
           cargs[ar] = convert!(Cargs.Types[ar])(simplified[i]);

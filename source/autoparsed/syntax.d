@@ -55,12 +55,79 @@ struct OneOf(Ts...){
   //pragma(msg, "Wrapped types for ", Ts, ": ", WrappedTypes);
 
   struct NodeType{
-    alias ST = SumType!WrappedTypes;
-    ST data;
-    alias data this;
-    static foreach(WT; WrappedTypes){
-      this(WT wt){
-        data = wt;
+
+    template CommonValueType(Ts...){
+
+      template isValueToken(T){
+        static if(isInstanceOf!(TokenType,T)){
+          enum isValueToken = !isType!(TemplateArgsOf!T[0]);
+        } else static if(isInstanceOf!(InRange, T)){
+          enum isValueToken = true;
+        } else {
+          enum isValueToken = false;
+        }
+      }
+
+      enum allValueTokens = allSatisfy!(isValueToken, Ts);
+      static if(allValueTokens){
+
+        template getValueType(T){
+          static if(isInstanceOf!(TokenType, T)){
+            alias getValueType = T.type;
+          } else static if(isInstanceOf!(InRange, T)){
+            alias getValueType = T.LimitType;
+          } else {
+            static assert(false);
+          }
+        }
+        /*alias getValue(T)= TemplateArgsOf!T[0];
+        alias TokenValues = staticMap!(getValue, Ts);
+        alias getType(alias V) = typeof(V);
+        */
+
+        alias ValueTypes = staticMap!(getValueType, Ts);
+
+        alias CT = CommonType!(ValueTypes);
+        static if(is(CT == void)){
+          enum HasCommonType = false;
+        } else {
+          enum HasCommonType = true;
+          alias CommonValueType = CT;
+        }
+
+      } else {
+        enum HasCommonType = false;
+      }
+
+      static if(!HasCommonType){
+        alias CommonValueType = void;
+      }
+    }
+
+    static if(is(CommonValueType!(WrappedTypes) == void)){
+      alias ST = SumType!WrappedTypes;
+      ST data;
+      alias data this;
+      static foreach(WT; WrappedTypes){
+        this(WT wt){
+          data = wt;
+        }
+      }
+      this(ST st){
+        data = st;
+      }
+    } else {
+      CommonValueType!WrappedTypes data;
+      alias data this;
+
+      this(X)(X x) if(is(typeof(cast(typeof(data))X.init))){ //char/dchar... ugh
+        data = cast(typeof(data))x;
+      }
+
+      this(X)(X x)
+        if(is(X : TokenType!Lit, alias Lit) &&
+           is(typeof(cast(typeof(data))Lit))){ //complicated because of char/dchar conversion
+        data = TemplateArgsOf!X[0];
       }
     }
   }
