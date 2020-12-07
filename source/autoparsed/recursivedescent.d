@@ -682,16 +682,13 @@ template ArgRanges(CA, TA, size_t Ci){
 
 
 auto simplifyPayload(bool KeepTokens = false, T)(T t){
-  pragma(msg, "Simpligying T: ", T);
 
   static if(isTuple!T && !isInstanceOf!(Nullable, T)){
 
     alias SimplifiedType(X) = ReturnType!( () => simplifyPayload(X.init));
     alias SimplifiedTypes = staticMap!(SimplifiedType, T.Types);
-    pragma(msg, "simplified types for ", T.Types, " are ", SimplifiedTypes);
 
     alias FilteredTypes = EraseAll!(void, SimplifiedTypes);
-    pragma(msg, "filtered types are ", FilteredTypes);
 
     FilteredTypes ret;
 
@@ -760,17 +757,14 @@ T construct(T, Args)(Args args){
   auto simplified = simplifyPayload(args);
   alias Stype = typeof(simplified);
 
-  pragma(msg, "simplified type of ", Args, " is ", Stype);
+  mixin CTLog!("simplified type of ", Args, " is ", Stype);
 
 
   static if(is(Stype : T)){
-    pragma(msg, "simplified version implicitly converts, cool");
     return make!T(simplified);
   } else {
-    pragma(msg,  "simplified version doesn't implicitly convert, need to do some work");
 
     alias Cargs = CArgs!T;
-    pragma(msg, "Cargs: ", Cargs);
 
     static if(!isTuple!Stype){
       //one arg simplified type, better be a 1 arg constructor
@@ -780,12 +774,10 @@ T construct(T, Args)(Args args){
 
 
       enum AR = ArgRanges!(Cargs, Stype, 0);
-      pragma(msg, "Cargs: ", Cargs, " Stype: ", Stype, " AR: ", AR);
 
       Cargs cargs;
 
       static foreach(i, ar; AR){
-        pragma(msg, "i: ", i, " ar: ", ar);
         static if(isArray!(Cargs[ar])){
           cargs[ar] ~= convert!(Cargs.Types[ar])(simplified[i]);
         } else {
