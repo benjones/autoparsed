@@ -52,7 +52,7 @@ struct AssignmentStatement {
 
 alias Statement = OneOf!(AssignmentStatement, Expression);
 
-alias ParameterList = AliasSeq!(lparen, RegexStar!(Identifier, Identifier, comma), Optional!(Identifier, Identifier));
+alias ParameterList = AliasSeq!(lparen, RegexStar!(Identifier, Identifier, comma), Optional!(Identifier, Identifier), rparen);
 
 @Syntax!(Identifier, Identifier, ParameterList, lcurly, RegexStar!Statement, rcurly)
 struct FunctionDeclaration{
@@ -79,6 +79,7 @@ struct CompilationUnit
 
 
 unittest{
+  import autoparsed.recursivedescent;
 
   string program = `type var
 ret func(argA nameA, argB nameB){}
@@ -92,6 +93,8 @@ ret gunc(argC nameC){ z = qwerty}
                                ).array;
   writeln("\n\nTOKENS:\n", tokens, "\n\n");
 
+  auto cu = parse!CompilationUnit(tokens);
 
+  writeln("parsed cu is: ", cu);
 
 }
