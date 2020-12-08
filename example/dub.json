@@ -1,12 +1,31 @@
 {
     "name": "example",
     "targetType": "executable",
+    "configurations" : [
+        {
+            "name": "example"
+        },
+        {
+            "name": "unittest",
+            "targetType": "executable",
+            "preBuildCommands": ["$DUB run --compiler=$$DC unit-threaded -c gen_ut_main -- -f bin/ut.d -d $DUB"],
+            "mainSourceFile": "bin/ut.d",
+            "excludedSourceFiles": ["main.d"],
+            "dependencies": {
+                "unit-threaded": "*"
+            }
+        }
+
+    ],
+
     "sourcePaths": ["."],
     "importPaths": ["."],
+    "excludedSourceFiles": ["bin/ut.d"],
     "mainSourceFile": "main.d",
     "dflags-dmd" : [],
     "dependencies":
     {
         "autoparsed": { "version" : "*", "path" : ".."}
+
     },
 }
