@@ -600,7 +600,7 @@ template ArgRanges(CA, TA, size_t Ci){
           .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
       } else {
         //Different element types, could be OK if the previous Targ matched this array
-        enum size_t[] ArgRanges = .ArgRanges!(CA, Wrap!(Targs[1..$]), Ci);
+        enum size_t[] ArgRanges = .ArgRanges!(Wrap!(Cargs[1..$]), TA, Ci + 1);
       }
 
     } else {
