@@ -13,7 +13,7 @@ import std.algorithm;
 import std.range;
 import std.array;
 
-import sumtype;
+import std.sumtype;
 
 
 @Token{
@@ -29,6 +29,10 @@ import sumtype;
     struct Whitespace{
       const(char)[] val;
     }
+
+
+  @Syntax!('i', 'f')
+    enum if_token;
 
   @Syntax!(RegexPlus!(OneOf!('-', InRange!('a','z'), InRange!('A', 'Z'))))
     struct Identifier{
@@ -55,14 +59,15 @@ struct ExpressionStatement {
   Expression exp;
 }
 
-alias Statement = OneOf!(AssignmentStatement, ExpressionStatement);
+alias StatementSyntax = OneOf!(AssignmentStatement, ExpressionStatement, IfStatement);
+alias StatementValue = StatementSyntax.NodeType;
 
 alias ParameterList = AliasSeq!(lparen, RegexStar!(Identifier, Identifier, comma), Optional!(Identifier, Identifier), rparen);
 
-@Syntax!(Identifier, Identifier, ParameterList, lcurly, RegexStar!Statement, rcurly)
+@Syntax!(Identifier, Identifier, ParameterList, lcurly, RegexStar!StatementSyntax, rcurly)
 struct FunctionDeclaration{
 
-  this(Identifier retType, Identifier name, Tuple!(Identifier, Identifier)[] parameters, Statement.NodeType[] body_){
+  this(Identifier retType, Identifier name, Tuple!(Identifier, Identifier)[] parameters, StatementValue[] body_){
     writeln("making a function decl with return type ", retType, " named ", name, " with params: ", parameters, " and body: ", body_);
   }
 
@@ -73,15 +78,26 @@ struct VariableDeclaration{
   Identifier type, name;
 }
 
-alias Declaration = OneOf!(FunctionDeclaration, VariableDeclaration);
+alias DeclarationSyntax = OneOf!(FunctionDeclaration, VariableDeclaration);
+alias DeclarationValue = DeclarationSyntax.NodeType;
 
-@Syntax!(RegexStar!Declaration)
+@Syntax!(RegexStar!DeclarationSyntax)
 struct CompilationUnit
 {
-  Declaration.NodeType[] decls;
+  DeclarationValue[] decls;
 
 }
 
+@Syntax!(if_token, lparen, Expression, rparen, lcurly, StatementSyntax, rcurly)
+class IfStatement {
+  this(Expression cond, StatementValue bod){
+    writefln("making an if statment with condition: %s and body: %s", cond, bod);
+    condition = cond;
+    body = bod;
+  }
+  Expression condition;
+  StatementValue body;
+}
 
 unittest{
   import autoparsed.recursivedescent;
@@ -89,6 +105,7 @@ unittest{
   string program = `type var;
 ret func(argA nameA, argB nameB){}
 ret gunc(argC nameC){ z = qwerty;}
+ret hunc(argD nameD){if (nameD) { y = asdf;}}
 `;
 
   auto lexer = Lexer!clike(program);

@@ -9,6 +9,5 @@
     "dflags-dmd" : ["-preview=markdown"],
     "subPackages" : ["example"],
     "dependencies" : {
-        "sumtype" : "~>1.0"
     }
 }
