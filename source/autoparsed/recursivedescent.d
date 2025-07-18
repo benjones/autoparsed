@@ -433,11 +433,13 @@ auto parse(alias Lit, TokenStream)(ref TokenStream tokenStream){
   alias StreamElementType = ElementType!TokenStream;
   alias PayloadType = Payload!(TokenType!Lit);
   alias RetType = ParseResult!(PayloadType, DefaultError);
+  alias LitType = typeof(Lit);
 
-  mixin CTLog!("Parse(non-check) literal `", Lit, "`",
-    "payload type: `", PayloadType, "` RetType: `", RetType, "`");
+  mixin CTLog!("Parse(non-check) literal `", Lit, "` of type", LitType.stringof,
+               " with payload type: `", PayloadType, "` RetType: `", RetType, "`",
+               " Stream Element Type: ", StreamElementType.stringof);
   RTLog("parsing(non-check) for `", Lit.stringof, "` with type ",
-    typeof(Lit).stringof," from stream: ", tokenStream);
+    LitType.stringof," from stream: ", tokenStream);
 
 
   if(tokenStream.empty()){
@@ -457,15 +459,38 @@ auto parse(alias Lit, TokenStream)(ref TokenStream tokenStream){
       return ret;
 
     } else { //stream is probably a dchar[]
-      if(tokenStream.front == Lit){
-        RTLog("found it, returning true");
-        auto ret = RetType(PayloadType());
-        tokenStream.popFront;
-        RTLog("stream after parsing literal: ", tokenStream);
-        return ret;
+      //this direction so a LitType of char works with StreamElementTYpe of dchar
+      static if(is(LitType: StreamElementType)){
+        //stream is compatible with lit
+        if(tokenStream.front == Lit){
+          RTLog("found it, returning true");
+          auto ret = RetType(PayloadType());
+          tokenStream.popFront;
+          RTLog("stream after parsing literal: ", tokenStream);
+          return ret;
+        } else {
+          RTLog("didn't find it, returning false");
+          return RetType(DefaultError("Looking for "~ Lit~ " but found "~ to!string(tokenStream.front)));
+        }
+      } else static if(is(ElementType!LitType: StreamElementType)){ //Lit is a stream of tokens (ie string)
+        mixin CTLog!("Lit is a sequence of tokens, lets match them");
+        import std.range: take, drop;
+        //try to match them all, back out on failure
+        auto copy = tokenStream;
+        foreach(i, elem; Lit){
+          if(copy.front != elem){
+            RTLog("sequence match failure, wanted %s, got %s", elem, copy.front);
+            //report chars up to failure
+            copy = tokenStream;
+            return RetType(DefaultError("Looking for " ~Lit~ " but found " ~ to!string(copy.take(i +1))));
+          }
+          copy.popFront;
+        }
+        tokenStream = tokenStream.drop(Lit.length);
+        return RetType(PayloadType());
+
       } else {
-        RTLog("didn't find it, returning false");
-        return RetType(DefaultError("Looking for "~ Lit~ " but found "~ to!string(tokenStream.front)));
+        static assert(false, "Lit and stream type incompatible");
       }
     }
   }

@@ -31,8 +31,13 @@ import std.sumtype;
     }
 
 
+  //syntax with sequence explicit
   @Syntax!('i', 'f')
     enum if_token;
+
+  //syntax where the only element is a type of sequence
+  @Syntax!("while")
+    enum while_token;
 
   @Syntax!(RegexPlus!(OneOf!('-', InRange!('a','z'), InRange!('A', 'Z'))))
     struct Identifier{
@@ -59,7 +64,7 @@ struct ExpressionStatement {
   Expression exp;
 }
 
-alias StatementSyntax = OneOf!(AssignmentStatement, ExpressionStatement, IfStatement);
+alias StatementSyntax = OneOf!(AssignmentStatement, ExpressionStatement, IfStatement, WhileStatement);
 alias StatementValue = StatementSyntax.NodeType;
 
 alias ParameterList = AliasSeq!(lparen, RegexStar!(Identifier, Identifier, comma), Optional!(Identifier, Identifier), rparen);
@@ -99,6 +104,17 @@ class IfStatement {
   StatementValue body;
 }
 
+@Syntax!(while_token, lparen, Expression, rparen, lcurly, StatementSyntax, rcurly)
+class WhileStatement {
+  this(Expression cond, StatementValue bod){
+    writefln("made a while statement with condition: %s and body: %s", cond, bod);
+    condition = cond;
+    body = bod;
+  }
+  Expression condition;
+  StatementValue body;
+}
+
 unittest{
   import autoparsed.recursivedescent;
 
@@ -118,5 +134,24 @@ ret hunc(argD nameD){if (nameD) { y = asdf;}}
   auto cu = parse!CompilationUnit(tokens);
 
   writeln("parsed cu is: ", cu);
+
+}
+
+unittest {
+  import autoparsed.recursivedescent;
+  string program = "ret func(){while(true){ x = y; }}";
+
+  auto lexer = Lexer!clike(program);
+  auto tokens = lexer.filter!( x => x.match!(
+                                 (Whitespace w) => false,
+                                 _ => true)
+                               ).array;
+  writeln("\n\nTOKENS:\n", tokens, "\n\n");
+
+  auto cu = parse!CompilationUnit(tokens);
+
+  writeln("parsed cu is: ", cu);
+
+  assert(cu.getPayload.contents.decls.length == 1);
 
 }
