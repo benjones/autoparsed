@@ -13,7 +13,7 @@ import std.algorithm;
 import std.range;
 import std.array;
 
-import sumtype;
+import std.sumtype;
 
 
 @Token{
@@ -22,13 +22,22 @@ import sumtype;
   enum lparen = '(';
   enum rparen = ')';
   enum comma = ',';
-  enum semi = ';'; //TODO, use this!!
+  enum semi = ';';
   enum eq = '=';
 
   @Syntax!(RegexPlus!(OneOf!(' ', '\t', '\n', '\r')))
     struct Whitespace{
       const(char)[] val;
     }
+
+
+  //syntax with sequence explicit
+  @Syntax!('i', 'f')
+    enum if_token;
+
+  //syntax where the only element is a type of sequence
+  @Syntax!("while")
+    enum while_token;
 
   @Syntax!(RegexPlus!(OneOf!('-', InRange!('a','z'), InRange!('A', 'Z'))))
     struct Identifier{
@@ -43,47 +52,76 @@ struct Expression{
   Identifier id;
 }
 
-@Syntax!(Identifier, eq, Expression)
+@Syntax!(Identifier, eq, Expression, semi)
 struct AssignmentStatement {
   this(Identifier id, Expression exp){
     writeln("assign statment with it: ", id, " and expression ", exp);
   }
 }
 
-alias Statement = OneOf!(AssignmentStatement, Expression);
+@Syntax!(Expression, semi)
+struct ExpressionStatement {
+  Expression exp;
+}
+
+alias StatementSyntax = OneOf!(AssignmentStatement, ExpressionStatement, IfStatement, WhileStatement);
+alias StatementValue = StatementSyntax.NodeType;
 
 alias ParameterList = AliasSeq!(lparen, RegexStar!(Identifier, Identifier, comma), Optional!(Identifier, Identifier), rparen);
 
-@Syntax!(Identifier, Identifier, ParameterList, lcurly, RegexStar!Statement, rcurly)
+@Syntax!(Identifier, Identifier, ParameterList, lcurly, RegexStar!StatementSyntax, rcurly)
 struct FunctionDeclaration{
 
-  this(Identifier retType, Identifier name, Tuple!(Identifier, Identifier)[] parameters, Statement.NodeType[] body_){
-    writeln("making a functino decl with return type ", retType, " named ", name, " with params: ", parameters, " and body: ", body_);
+  this(Identifier retType, Identifier name, Tuple!(Identifier, Identifier)[] parameters, StatementValue[] body_){
+    writeln("making a function decl with return type ", retType, " named ", name, " with params: ", parameters, " and body: ", body_);
   }
 
 }
 
-@Syntax!(Identifier, Identifier)
+@Syntax!(Identifier, Identifier, semi)
 struct VariableDeclaration{
   Identifier type, name;
 }
 
-alias Declaration = OneOf!(FunctionDeclaration, VariableDeclaration);
+alias DeclarationSyntax = OneOf!(FunctionDeclaration, VariableDeclaration);
+alias DeclarationValue = DeclarationSyntax.NodeType;
 
-@Syntax!(RegexStar!Declaration)
+@Syntax!(RegexStar!DeclarationSyntax)
 struct CompilationUnit
 {
-  Declaration.NodeType[] decls;
+  DeclarationValue[] decls;
 
 }
 
+@Syntax!(if_token, lparen, Expression, rparen, lcurly, StatementSyntax, rcurly)
+class IfStatement {
+  this(Expression cond, StatementValue bod){
+    writefln("making an if statment with condition: %s and body: %s", cond, bod);
+    condition = cond;
+    body = bod;
+  }
+  Expression condition;
+  StatementValue body;
+}
+
+@Syntax!(while_token, lparen, Expression, rparen, lcurly, StatementSyntax, rcurly)
+class WhileStatement {
+  this(Expression cond, StatementValue bod){
+    writefln("made a while statement with condition: %s and body: %s", cond, bod);
+    condition = cond;
+    body = bod;
+  }
+  Expression condition;
+  StatementValue body;
+}
 
 unittest{
   import autoparsed.recursivedescent;
 
-  string program = `type var
+  string program = `type var;
 ret func(argA nameA, argB nameB){}
-ret gunc(argC nameC){ z = qwerty}
+ret gunc(argC nameC){ z = qwerty;}
+ret hunc(argD nameD){if (nameD) { y = asdf;}}
 `;
 
   auto lexer = Lexer!clike(program);
@@ -96,5 +134,24 @@ ret gunc(argC nameC){ z = qwerty}
   auto cu = parse!CompilationUnit(tokens);
 
   writeln("parsed cu is: ", cu);
+
+}
+
+unittest {
+  import autoparsed.recursivedescent;
+  string program = "ret func(){while(true){ x = y; }}";
+
+  auto lexer = Lexer!clike(program);
+  auto tokens = lexer.filter!( x => x.match!(
+                                 (Whitespace w) => false,
+                                 _ => true)
+                               ).array;
+  writeln("\n\nTOKENS:\n", tokens, "\n\n");
+
+  auto cu = parse!CompilationUnit(tokens);
+
+  writeln("parsed cu is: ", cu);
+
+  assert(cu.getPayload.contents.decls.length == 1);
 
 }

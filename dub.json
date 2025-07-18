@@ -6,6 +6,5 @@
     "description": "Auto generate a parse from node types with simple annotations",
     "license": "MIT",
     "name": "autoparsed",
-    "subPackages" : ["example"],
-
+    "subPackages" : ["example"]
 }

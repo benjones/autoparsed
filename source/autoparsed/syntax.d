@@ -1,5 +1,8 @@
 module autoparsed.syntax;
 
+import autoparsed.log;
+import autoparsed.traits;
+
 ///UDA type for annotating constructors as grammar rules
 struct Syntax(T...){
   alias Elements = T;
@@ -17,11 +20,19 @@ enum Token;
 ///Wrapper type necessary for value tokens '(', ')', whitespace, etc
 struct TokenType(alias T){
   import std.traits : isType;
+  mixin CTLog!("insantiating TokenType of ", T);
 
   static if(isType!T){
+    mixin CTLog!(T, "is a type!");
     alias type = T;
-    T value;
+    static if(isInstantiable!T){
+      mixin CTLog!("and", T, "is instantiable");
+      T value;
+    } else {
+      mixin CTLog!("but", T, "is not instantiable");
+    }
   } else {
+    mixin CTLog!("it's NOT a type!");
     alias type = typeof(T);
     enum value = T;
   }
@@ -42,9 +53,10 @@ struct OneOf(Ts...){
       pragma(msg, "type provided: " ~ fullyQualifiedName!Ts[0]);
     }
   }
-  import sumtype;
+  import std.sumtype;
+  import autoparsed.traits;
   template Wrap(alias T){
-    static if(!isType!T) {
+    static if(!isType!T || !isInstantiable!T) {
       alias Wrap = TokenType!T;
     } else {
       alias Wrap = T;
