@@ -18,9 +18,10 @@ template tokensFromModule(alias Module){
 template tokenTypes(alias Module){
   import std.meta : staticMap;
   import std.traits : isType;
+  import autoparsed.traits;
 
   template wrap(alias T){
-    static if(!isType!T){
+    static if(!isType!T || !isInstantiable!T){
       alias wrap = TokenType!T;
     } else {
       alias wrap = T;
@@ -30,7 +31,7 @@ template tokenTypes(alias Module){
 }
 
 template TokenPayload(alias Module){
-  import sumtype;
+  import std.sumtype;
   alias TokenPayload = SumType!(tokenTypes!Module);
 }
 

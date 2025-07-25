@@ -82,6 +82,10 @@ struct JSONObject{
   }
 }
 
+import autoparsed.traits;
+static assert(isInstantiable!JSONValue);
+static assert(isInstantiable!JSONObject);
+
 @Syntax!(lbracket, RegexStar!(JSONValueSyntax, comma), Optional!(JSONValueSyntax), rbracket)
 struct JSONArray{
   private JSONValue[] data;
@@ -100,6 +104,9 @@ unittest{
   import std.algorithm;
   import std.conv : to;
   import autoparsed.recursivedescent;
+
+  JSONObject testObject;
+  JSONObject testObject2 = void;
 
   writeln("\n\nRUNNING\n\n");
   auto testString = `{"hello" : "world", "key" : 45, "anArray" :[1, "a string", {}]}`;
