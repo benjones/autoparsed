@@ -99,8 +99,8 @@ template partOfStream(T, StreamElement){
   mixin CTLog!("POS result: ", partOfStream);
 }
 
-enum hasUDASafe(alias X, alias UDA) = __traits(compiles, hasUDA!(X, UDA)) && hasUDA!(X, UDA);
-enum isArraySafe(X...) = __traits(compiles, isArray!X) && isArray!X;
+enum hasUDASafe(alias X, alias UDA) = isType!X && hasUDA!(X, UDA);
+enum isArraySafe(X...) = isType!X && isArray!X;
 
 unittest {
 
