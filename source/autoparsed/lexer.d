@@ -19,13 +19,13 @@ struct Lexer(alias Mod){
 
   import std.traits : fullyQualifiedName;
 
-  import sumtype;
+  import std.sumtype;
   import std.typecons : Nullable;
 
   mixin CTLog!("lexer for module: ", fullyQualifiedName!Mod);
   mixin CTLog!("TT for mod: ", tokenTypes!Mod);
   alias parseRule = OneOf!(tokenTypes!Mod);
-  mixin CTLog!("lexer parse rule types: ", parseRule);  
+  mixin CTLog!("lexer parse rule types: ", parseRule);
 
   ///
   this(const(char)[] bytes){
@@ -64,9 +64,9 @@ struct Lexer(alias Mod){
     }
 
   }
-  
+
 private:
   const(char)[] bytes_;
   Nullable!(parseRule.NodeType) front_;
-  
+
 }

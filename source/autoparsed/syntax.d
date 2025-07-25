@@ -42,7 +42,7 @@ struct OneOf(Ts...){
       pragma(msg, "type provided: " ~ fullyQualifiedName!Ts[0]);
     }
   }
-  import sumtype;
+  import std.sumtype;
   template Wrap(alias T){
     static if(!isType!T) {
       alias Wrap = TokenType!T;

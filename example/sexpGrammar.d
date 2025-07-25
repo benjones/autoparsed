@@ -10,7 +10,7 @@ import autoparsed.autoparsed;
 import autoparsed.lexer;
 import autoparsed.syntax;
 
-import sumtype;
+import std.sumtype;
 
 
 

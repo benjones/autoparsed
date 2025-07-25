@@ -12,7 +12,7 @@ import std.algorithm;
 import std.array;
 import std.range.primitives;
 
-import sumtype;
+import std.sumtype;
 
 ///Common type returned on a successful call to parse
 struct Payload(T){

@@ -13,7 +13,7 @@ import std.algorithm;
 import std.range;
 import std.array;
 
-import sumtype;
+import std.sumtype;
 
 
 @Token{
@@ -58,7 +58,8 @@ alias ParameterList = AliasSeq!(lparen, RegexStar!(Identifier, Identifier, comma
 struct FunctionDeclaration{
 
   this(Identifier retType, Identifier name, Tuple!(Identifier, Identifier)[] parameters, Statement.NodeType[] body_){
-    writeln("making a functino decl with return type ", retType, " named ", name, " with params: ", parameters, " and body: ", body_);
+    writeln("making a functino decl with return type ", retType, " named ", name,
+            " with params: ", parameters, " and body: ", body_);
   }
 
 }
@@ -86,7 +87,8 @@ ret func(argA nameA, argB nameB){}
 ret gunc(argC nameC){ z = qwerty}
 `;
 
-  auto lexer = Lexer!clike(program);
+  alias thisModule = __traits(parent, CompilationUnit);
+  auto lexer = Lexer!thisModule(program);
   auto tokens = lexer.filter!( x => x.match!(
                                  (Whitespace w) => false,
                                  _ => true)

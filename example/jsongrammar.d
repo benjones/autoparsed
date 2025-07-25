@@ -12,7 +12,7 @@ import autoparsed.log;
 
 import std.typecons : Tuple;
 
-import sumtype;
+import std.sumtype;
 
 @Token {
   enum lcurly = '{';

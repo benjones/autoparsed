@@ -7,7 +7,7 @@ void main(string[] args){
   import std.traits;
   import std.array;
   import std.algorithm;
-  import sumtype;
+  import std.sumtype;
 
   import sexpGrammar;
 

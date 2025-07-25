@@ -8,8 +8,10 @@ mixin template CTLog(Args...){
   debug(AutoparsedCTLog){
 
     pragma(msg, Args);
-    //    import std.array;
-    //    pragma(msg, [Args].join(", "));
+    //enum so(X) = X.stringof;
+    //import std.meta;
+    //import std.array;
+    //pragma(msg, [StaticMap!(so,Args)].join(", "));
   }
 }
 
